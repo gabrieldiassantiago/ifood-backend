@@ -44,4 +44,42 @@ export const auth = new Elysia({ prefix: "/auth" })
                 password: t.String()
             })
         }
-    );
+    )
+    .post(
+        "/admin/login",
+        async ({ jwt, body, set }) => {
+            try {
+
+                const authService = new AuthService();
+                
+                const user = await authService.loginAdmin(
+                    body.email,
+                    body.password
+                );
+
+                const token = await jwt.sign({
+                    id: user.id,
+                    email: user.email,
+                    role: user.role
+                });
+
+                return {
+                    token,
+                    user
+                };
+            } catch (error) {
+                set.status = 401;
+                return {
+                    error: error instanceof Error ? error.message : "Authentication failed"
+                };
+            }
+        },
+        {
+            body: t.Object({
+                email: t.String(),
+                password: t.String()
+            })
+        }
+    )
+    ;
+    
