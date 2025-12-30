@@ -22,17 +22,25 @@ export class UsersService {
         const existingUserByEmail = data.email ? await this.usersRepository.findByEmail(data.email) : null;
 
         if (existingUserByEmail) {
-            throw new Error("Email already in use");
+            throw new Error("Email já em uso");
         }
         
         const existingUserByPhone = await this.usersRepository.findByPhone(data.phone);
 
         if (existingUserByPhone) {
-            throw new Error("Phone number already in use");
+            throw new Error("Número de telefone já em uso");
         }
 
-        const newUser = await this.usersRepository.create(data);
-        return newUser;
+       const hashedPassword = await Bun.password.hash(data.password, {
+        algorithm: "bcrypt",
+        cost: 4,
+       });
+
+       const newUser = await this.usersRepository.create({
+        ...data,
+        password: hashedPassword,
+       })
+       return newUser;
 
     }
 }

@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import { users } from "./modules/users/users.controller";
+import { auth } from "./modules/auth/auth.controller";
 
 const app = new Elysia()
   .get("/", () => ({
@@ -7,6 +8,7 @@ const app = new Elysia()
     version: "1.0.0",
   }))
   .use(users)
+  .use(auth)
   .listen(3000);
 
 console.log(
