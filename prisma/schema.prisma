@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  CREATED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+}
+
+model User {
+  id        String @id @default(uuid())
+  role      Role   @default(USER)
+
+  name      String
+  phone     String @unique
+  email     String? @unique
+  password  String
+
+  address   Address[]
+  orders    Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StoreConfig {
+  id        String @id @default(uuid())
+  name      String
+  address   String
+  phone     String
+  isOpen    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeliveryFee {
+  id       String @id @default(uuid())
+  district String
+  price    Float
+  isActive Boolean @default(true)
+}
+
+model Category {
+  id       String @id @default(uuid())
+  name     String
+  isActive Boolean @default(true)
+  order    Int
+
+  products Product[]
+}
+
+model Product {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  isAvailable Boolean @default(true)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  addons     Addon[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+}
+
+model Addon {
+  id       String @id @default(uuid())
+  name     String
+  price    Float
+  isActive Boolean @default(true)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id        String @id @default(uuid())
+  status    OrderStatus @default(CREATED)
+
+  subtotal      Float
+  deliveryFee   Float
+  total         Float
+
+  deliveryDistrict String
+
+  paymentMethod PaymentMethod
+  changeFor     Float?
+  observation   String?
+
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+
+  addressId String
+  address   Address @relation(fields: [addressId], references: [id])
+
+  items     OrderItem[]
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  quantity Int
+  price    Float
+
+  orderId  String
+  order    Order   @relation(fields: [orderId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  addons    OrderItemAddon[]
+}
+
+model OrderItemAddon {
+  id    String @id @default(uuid())
+  name  String
+  price Float
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+}
+
+model Address {
+  id        String @id @default(uuid())
+  street    String
+  number    String
+  district  String
+  city      String
+  reference String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  orders Order[]
+}
