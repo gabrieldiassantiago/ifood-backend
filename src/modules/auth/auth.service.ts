@@ -10,13 +10,13 @@ export class AuthService {
     const user = await this.authRepository.findByPhone(phone);
 
     if (!user) {
-        throw new Error("Invalid phone number or password");
+        throw new Error("Telefone ou senha inválidos");
     }
 
     const isPasswordValid = await Bun.password.verify(password, user.password);
 
     if (!isPasswordValid) {
-        throw new Error("Invalid phone number or password");
+        throw new Error("Telefone ou senha inválidos");
     }
 
     return {
