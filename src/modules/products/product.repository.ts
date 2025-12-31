@@ -99,4 +99,33 @@ export class ProductRepository {
       where: { id },
     });
   }
+
+  createAddon(productId: string, data: { name: string; price: number }) {
+    return prisma.addon.create({
+      data: {
+        name: data.name,
+        price: data.price,
+        productId,
+      },
+    });
+  }
+
+  findAddonsByProductId(productId: string) {
+    return prisma.addon.findMany({
+      where: { productId, isActive: true },
+    });
+  }
+
+  updateAddon(id: string, data: { name?: string; price?: number; isActive?: boolean }) {
+    return prisma.addon.update({
+      where: { id },
+      data,
+    });
+  }
+
+  deleteAddon(id: string) {
+    return prisma.addon.delete({
+      where: { id },
+    });
+  }
 }

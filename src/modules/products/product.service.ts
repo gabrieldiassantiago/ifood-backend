@@ -2,6 +2,8 @@ import { ProductRepository } from "./product.repository";
 import { CreateProductInput, UpdateProductInput } from "./product.model";
 import { ProductNotFoundError, InvalidPriceError } from "./errors/products.errors";
 
+//future: refatorar para evitar regra de negocio fora do contexto de product
+
 export class ProductService {
   constructor(
     private repository: ProductRepository = new ProductRepository()
@@ -52,5 +54,33 @@ export class ProductService {
   async toggleAvailability(id: string) {
     const product = await this.getProductById(id);
     return this.repository.update(id, { isAvailable: !product.isAvailable });
+  }
+
+  async addAddon(productId: string, data: { name: string; price: number }) {
+
+    await this.getProductById(productId);
+
+    if (data.price <= 0) {
+      throw new InvalidPriceError();
+    }
+
+    return this.repository.createAddon(productId, data);
+  }
+
+  async getProductAddons(productId: string) {
+    await this.getProductById(productId);
+    return this.repository.findAddonsByProductId(productId);
+  }
+
+  async updateAddon(addonId: string, data: { name?: string; price?: number; isActive?: boolean }) {
+    if (data.price !== undefined && data.price <= 0) {
+      throw new InvalidPriceError();
+    }
+
+    return this.repository.updateAddon(addonId, data);
+  }
+
+  async deleteAddon(addonId: string) {
+    return this.repository.deleteAddon(addonId);
   }
 }
