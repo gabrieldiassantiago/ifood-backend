@@ -8,7 +8,7 @@ export class ProductNotFoundError extends NotFoundError {
 
 export class InvalidPriceError extends ValidationError {
   constructor() {
-    super("Preço deve ser maior que 0", "INVALID_PRICE");
+    super("Preço deve ser maior do que 0", "INVALID_PRICE");
   }
 }
 
