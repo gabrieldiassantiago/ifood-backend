@@ -1,4 +1,3 @@
-import jwt from "@elysiajs/jwt";
 import { AuthRepository } from "./auth.repository";
 
 export class AuthService {
@@ -35,7 +34,7 @@ async loginAdmin(email: string, password: string) {
     const isValidUser = await this.authRepository.findByEmail(email);
     
     if (!isValidUser || isValidUser.role !== "ADMIN") {
-        throw new Error("Email ou senha inválidos"); //padronizar erros
+        throw new Error("Email ou senha inválidos"); //melhorar aqui ainda
     }
 
     if (!user) {

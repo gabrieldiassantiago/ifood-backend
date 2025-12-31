@@ -42,7 +42,12 @@ export const auth = new Elysia({ prefix: "/auth" })
             body: t.Object({
                 phone: t.String(),
                 password: t.String()
-            })
+            }),
+            detail: {
+                tags: ["Auth"],
+                summary: "Login de usuário",
+                description: "Autentica um usuário usando telefone e senha. Retorna um token JWT válido por 7 dias.",
+            }
         }
     )
     .post(
@@ -78,7 +83,12 @@ export const auth = new Elysia({ prefix: "/auth" })
             body: t.Object({
                 email: t.String(),
                 password: t.String()
-            })
+            }),
+            detail: {
+                tags: ["Auth"],
+                summary: "Login de administrador",
+                description: "Autentica um administrador usando email e senha. Retorna um token JWT válido por 7 dias.",
+            }
         }
     )
     ;
