@@ -5,8 +5,8 @@ import { authMiddleware } from "../../middlewares/auth.middleware";
 const paymentService = new PaymentService();
 
 export const payments = new Elysia({ prefix: "/payments" })
-  // Webhook do Mercado Pago (sem autenticação) - DEVE vir ANTES do authMiddleware
-  .post(
+
+.post(
     "/webhook",
     async ({ body }) => {
       const result = await paymentService.handleWebhook(body);
@@ -138,6 +138,37 @@ export const payments = new Elysia({ prefix: "/payments" })
         tags: ["Payments"],
         summary: "Listar todos os pagamentos",
         description: "Retorna a lista de todos os pagamentos registrados no sistema.",
+        security: [{ bearerAuth: [] }],
+      },
+    }
+  )
+
+  // Reembolsar pagamento
+  .post(
+    "/refund",
+    async ({ body }: any) => {
+      const refund = await paymentService.refundPayment({
+        paymentId: body.paymentId,
+        amount: body.amount,
+      });
+      
+      return {
+        success: true,
+        data: refund,
+        message: "Reembolso realizado com sucesso",
+      };
+    },
+    {
+      body: t.Object({
+        paymentId: t.String(),
+        amount: t.Optional(t.Number({ 
+          description: "Valor do reembolso. Se não informado, reembolsa o valor total" 
+        })),
+      }),
+      detail: {
+        tags: ["Payments"],
+        summary: "Reembolsar pagamento PIX",
+        description: "Cria um reembolso total ou parcial de um pagamento PIX aprovado. O pedido será automaticamente cancelado.",
         security: [{ bearerAuth: [] }],
       },
     }

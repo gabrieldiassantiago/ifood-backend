@@ -1,6 +1,6 @@
-import { getMercadoPagoClient } from "../../config/mercadopago.config";
+import { getMercadoPagoClient, getMercadoPagoRefundClient } from "../../config/mercadopago.config";
 import { PaymentRepository } from "./payment.repository";
-import { CreatePaymentInput, PaymentPixData } from "./payment.types";
+import { CreatePaymentInput, PaymentPixData, RefundPaymentInput, RefundPaymentResponse } from "./payment.types";
 import { PaymentMethod, PaymentStatus, OrderStatus } from "../../../generated/prisma/enums";
 import { 
   PaymentNotFoundError, 
@@ -52,7 +52,6 @@ export class PaymentService {
         throw new MercadoPagoError("QR Code PIX não disponível");
       }
 
-      // Salva o pagamento no banco de dados
       await this.repository.create({
         orderId: data.orderId,
         amount: data.amount,
@@ -70,6 +69,7 @@ export class PaymentService {
         paymentId: response.id.toString(),
         ticketUrl: pixData.ticket_url,
       };
+
     } catch (error) {
       if (error instanceof PaymentAlreadyExistsError || error instanceof MercadoPagoError) {
         throw error;
@@ -124,10 +124,8 @@ export class PaymentService {
           internalStatus = PaymentStatus.PENDING;
       }
 
-      // Atualiza o status no banco de dados
       const payment = await this.repository.updateStatus(paymentId, internalStatus);
       
-      // Se o pagamento foi aprovado, atualiza o status do pedido
       if (internalStatus === PaymentStatus.APPROVED && payment) {
         await prisma.order.update({
           where: { id: payment.orderId },
@@ -160,5 +158,64 @@ export class PaymentService {
 
   async getAllPayments() {
     return this.repository.findAll();
+  }
+
+  async refundPayment(data: RefundPaymentInput): Promise<RefundPaymentResponse> {
+    try {
+
+      const payment = await this.repository.findByPaymentId(data.paymentId);
+      
+      if (!payment) {
+        throw new PaymentNotFoundError(data.paymentId);
+      }
+
+
+
+      // Verifica se já foi reembolsado
+      if (payment.status === PaymentStatus.REFUNDED) {
+        throw new MercadoPagoError("Pagamento já foi reembolsado");
+      }
+
+        // Verifica se o pagamento está aprovado
+      if (payment.status !== PaymentStatus.APPROVED) {
+        throw new MercadoPagoError("Só é possível reembolsar pagamentos aprovados");
+      }
+    
+      const refundClient = getMercadoPagoRefundClient();
+      
+      // Cria o reembolso no Mercado Pago
+      const refundAmount = data.amount || payment.amount;
+      
+      const response = await refundClient.create({
+        payment_id: data.paymentId,
+        body: {
+          amount: refundAmount,
+        }
+      });
+
+      if (!response.id) {
+        throw new MercadoPagoError("Falha ao criar reembolso");
+      }
+
+      await this.repository.updateStatus(data.paymentId, PaymentStatus.REFUNDED);
+
+      await prisma.order.update({
+        where: { id: payment.orderId },
+        data: { status: OrderStatus.CANCELLED }
+      });
+
+      return {
+        refundId: response.id.toString(),
+        status: response.status || "approved",
+        amount: refundAmount,
+        paymentId: data.paymentId,
+      };
+      
+    } catch (error) {
+      if (error instanceof PaymentNotFoundError || error instanceof MercadoPagoError) {
+        throw error;
+      }
+      throw new MercadoPagoError((error as Error).message);
+    }
   }
 }

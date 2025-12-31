@@ -27,3 +27,15 @@ export interface UpdatePaymentStatusInput {
   paymentId: string;
   status: PaymentStatus;
 }
+
+export interface RefundPaymentInput {
+  paymentId: string;
+  amount?: number; 
+}
+
+export interface RefundPaymentResponse {
+  refundId: string;
+  status: string;
+  amount: number;
+  paymentId: string;
+}
