@@ -1,0 +1,164 @@
+import { getMercadoPagoClient } from "../../config/mercadopago.config";
+import { PaymentRepository } from "./payment.repository";
+import { CreatePaymentInput, PaymentPixData } from "./payment.types";
+import { PaymentMethod, PaymentStatus, OrderStatus } from "../../../generated/prisma/enums";
+import { 
+  PaymentNotFoundError, 
+  PaymentAlreadyExistsError,
+  MercadoPagoError,
+  InvalidPaymentMethodError 
+} from "./errors/payment.errors";
+import { prisma } from "../../../prisma/db";
+
+export class PaymentService {
+  constructor(
+    private repository: PaymentRepository = new PaymentRepository(),
+  ) {}
+
+  async createPixPayment(data: CreatePaymentInput): Promise<PaymentPixData> {
+
+    const existingPayment = await this.repository.findByOrderId(data.orderId);
+    if (existingPayment) {
+      throw new PaymentAlreadyExistsError(data.orderId);
+    }
+
+    if (data.paymentMethod !== PaymentMethod.PIX) {
+      throw new InvalidPaymentMethodError();
+    }
+
+    try {
+
+      const paymentClient = getMercadoPagoClient();
+      
+      const response = await paymentClient.create({
+        body: {
+          transaction_amount: data.amount,
+          description: data.description || "Pedido iFood",
+          payment_method_id: "pix",
+          payer: {
+            email: data.userEmail || "user@example.com",
+          },
+          external_reference: data.orderId,
+        }
+      });
+
+      if (!response.id) {
+        throw new MercadoPagoError("Falha ao criar pagamento PIX");
+      }
+
+      const pixData = response.point_of_interaction?.transaction_data;
+      
+      if (!pixData?.qr_code || !pixData?.qr_code_base64) {
+        throw new MercadoPagoError("QR Code PIX não disponível");
+      }
+
+      // Salva o pagamento no banco de dados
+      await this.repository.create({
+        orderId: data.orderId,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod,
+        description: data.description,
+        paymentId: response.id.toString(),
+        qrCode: pixData.qr_code,
+        qrCodeBase64: pixData.qr_code_base64,
+        ticketUrl: pixData.ticket_url,
+      });
+
+      return {
+        qrCode: pixData.qr_code,
+        qrCodeBase64: pixData.qr_code_base64,
+        paymentId: response.id.toString(),
+        ticketUrl: pixData.ticket_url,
+      };
+    } catch (error) {
+      if (error instanceof PaymentAlreadyExistsError || error instanceof MercadoPagoError) {
+        throw error;
+      }
+      throw new MercadoPagoError((error as Error).message);
+    }
+  }
+
+  async getPaymentById(id: string) {
+    const payment = await this.repository.findById(id);
+    
+    if (!payment) {
+      throw new PaymentNotFoundError(id);
+    }
+
+    return payment;
+  }
+
+  async getPaymentByOrderId(orderId: string) {
+    const payment = await this.repository.findByOrderId(orderId);
+    
+    if (!payment) {
+      throw new PaymentNotFoundError(orderId);
+    }
+
+    return payment;
+  }
+
+  async checkPaymentStatus(paymentId: string) {
+    try {
+      const paymentClient = getMercadoPagoClient();
+      const response = await paymentClient.get({ id: paymentId });
+      
+      const mercadoPagoStatus = response.status;
+      
+      let internalStatus: PaymentStatus;
+
+      switch (mercadoPagoStatus) {
+        case "approved":
+          internalStatus = PaymentStatus.APPROVED;
+          break;
+        case "rejected":
+          internalStatus = PaymentStatus.REJECTED;
+          break;
+        case "cancelled":
+          internalStatus = PaymentStatus.CANCELLED;
+          break;
+        case "refunded":
+          internalStatus = PaymentStatus.REFUNDED;
+          break;
+        default:
+          internalStatus = PaymentStatus.PENDING;
+      }
+
+      // Atualiza o status no banco de dados
+      const payment = await this.repository.updateStatus(paymentId, internalStatus);
+      
+      // Se o pagamento foi aprovado, atualiza o status do pedido
+      if (internalStatus === PaymentStatus.APPROVED && payment) {
+        await prisma.order.update({
+          where: { id: payment.orderId },
+          data: { status: OrderStatus.PREPARING }
+        });
+      }
+      
+      return {
+        status: internalStatus,
+        mercadoPagoStatus,
+        payment,
+      };
+    } catch (error) {
+      throw new MercadoPagoError((error as Error).message);
+    }
+  }
+
+  async handleWebhook(webhookData: any) {
+    try {
+      if (webhookData.type === "payment") {
+        const paymentId = webhookData.data.id.toString();
+        return await this.checkPaymentStatus(paymentId);
+      }
+      
+      return null;
+    } catch (error) {
+      throw new MercadoPagoError((error as Error).message);
+    }
+  }
+
+  async getAllPayments() {
+    return this.repository.findAll();
+  }
+}
