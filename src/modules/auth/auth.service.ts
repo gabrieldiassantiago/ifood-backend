@@ -31,14 +31,9 @@ async loginAdmin(email: string, password: string) {
 
     const user = await this.authRepository.findByEmail(email);
 
-    const isValidUser = await this.authRepository.findByEmail(email);
     
-    if (!isValidUser || isValidUser.role !== "ADMIN") {
+    if (!user || user.role !== "ADMIN") {
         throw new Error("Email ou senha inválidos"); //melhorar aqui ainda
-    }
-
-    if (!user) {
-        throw new Error("Email ou senha inválidos");
     }
 
     const isPasswordValid = await Bun.password.verify(password, user.password);
