@@ -31,7 +31,6 @@ async loginAdmin(email: string, password: string) {
 
     const user = await this.authRepository.findByEmail(email);
 
-    
     if (!user || user.role !== "ADMIN") {
         throw new Error("Email ou senha inválidos"); //melhorar aqui ainda
     }
