@@ -27,6 +27,14 @@ enum PaymentMethod {
   PIX
 }
 
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+
 model User {
   id        String @id @default(uuid())
   role      Role   @default(USER)
@@ -39,6 +47,8 @@ model User {
   address   Address[]
   orders    Order[]
 
+  points    Int    @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -49,6 +59,8 @@ model StoreConfig {
   address   String
   phone     String
   isOpen    Boolean @default(true)
+  //tempo estimado de entrega em minutos
+  estimatedDeliveryTime Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -118,6 +130,7 @@ model Order {
   address   Address @relation(fields: [addressId], references: [id])
 
   items     OrderItem[]
+  payment   Payment?
 
   createdAt DateTime @default(now())
 
@@ -160,4 +173,31 @@ model Address {
   user   User   @relation(fields: [userId], references: [id])
 
   orders Order[]
+}
+
+model Payment {
+  id        String @id @default(uuid())
+  
+  // Mercado Pago fields
+  paymentId          String? @unique  // ID do pagamento no Mercado Pago
+  qrCode             String?          // QR Code para PIX
+  qrCodeBase64       String?          // QR Code em base64
+  ticketUrl          String?          // URL do boleto/comprovante
+  
+  amount             Float
+  status             PaymentStatus @default(PENDING)
+  paymentMethod      PaymentMethod
+  
+  // Additional info
+  externalReference  String?          // Referência externa
+  description        String?
+  
+  orderId   String @unique
+  order     Order  @relation(fields: [orderId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([paymentId])
 }
