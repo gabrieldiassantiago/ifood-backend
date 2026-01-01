@@ -1,6 +1,7 @@
-import { MercadoPagoConfig, Payment } from "mercadopago";
+import { MercadoPagoConfig, Payment, PaymentRefund } from "mercadopago";
 
 let mercadoPagoClient: Payment;
+let mercadoPagoRefundClient: PaymentRefund;
 
 export const configureMercadoPago = () => {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
@@ -15,6 +16,7 @@ export const configureMercadoPago = () => {
   });
   
   mercadoPagoClient = new Payment(client);
+  mercadoPagoRefundClient = new PaymentRefund(client);
 };
 
 export const getMercadoPagoClient = (): Payment => {
@@ -24,4 +26,13 @@ export const getMercadoPagoClient = (): Payment => {
   }
   
   return mercadoPagoClient;
+};
+
+export const getMercadoPagoRefundClient = (): PaymentRefund => {
+
+  if (!mercadoPagoRefundClient) {
+    throw new Error("Mercado Pago não foi configurado. Chame configureMercadoPago() primeiro.");
+  }
+  
+  return mercadoPagoRefundClient;
 };
