@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum Role {
@@ -13,7 +13,9 @@ enum Role {
 }
 
 enum OrderStatus {
+  PENDING_PAYMENT
   CREATED
+  CONFIRMED
   PREPARING
   OUT_FOR_DELIVERY
   DELIVERED
