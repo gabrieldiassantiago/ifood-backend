@@ -1,4 +1,4 @@
-import { MercadoPagoConfig, Payment, PaymentRefund } from "mercadopago";
+import { MercadoPagoConfig, Payment, PaymentRefund, } from "mercadopago";
 
 let mercadoPagoClient: Payment;
 let mercadoPagoRefundClient: PaymentRefund;
@@ -17,6 +17,7 @@ export const configureMercadoPago = () => {
   
   mercadoPagoClient = new Payment(client);
   mercadoPagoRefundClient = new PaymentRefund(client);
+
 };
 
 export const getMercadoPagoClient = (): Payment => {
