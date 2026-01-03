@@ -9,6 +9,7 @@ import {
   InvalidPaymentMethodError 
 } from "./errors/payment.errors";
 import { prisma } from "../../../prisma/db";
+import { OrderService } from "../orders/order.service";
 
 export class PaymentService {
   constructor(
@@ -126,11 +127,16 @@ export class PaymentService {
 
       const payment = await this.repository.updateStatus(paymentId, internalStatus);
       
+      // Confirmar o pedido quando o pagamento for aprovado
       if (internalStatus === PaymentStatus.APPROVED && payment) {
-        await prisma.order.update({
-          where: { id: payment.orderId },
-          data: { status: OrderStatus.PREPARING }
-        });
+        const orderService = new OrderService();
+        
+        try {
+          // Confirmar pagamento PIX e mudar status do pedido para CREATED
+          await orderService.confirmPixPayment(payment.orderId);
+        } catch (error) {
+          console.error('Erro ao confirmar pedido PIX:', error);
+        }
       }
       
       return {
@@ -165,18 +171,17 @@ export class PaymentService {
 
       const payment = await this.repository.findByPaymentId(data.paymentId);
       
+      
       if (!payment) {
         throw new PaymentNotFoundError(data.paymentId);
       }
-
-
 
       // Verifica se já foi reembolsado
       if (payment.status === PaymentStatus.REFUNDED) {
         throw new MercadoPagoError("Pagamento já foi reembolsado");
       }
 
-        // Verifica se o pagamento está aprovado
+      // Verifica se o pagamento está aprovado
       if (payment.status !== PaymentStatus.APPROVED) {
         throw new MercadoPagoError("Só é possível reembolsar pagamentos aprovados");
       }
@@ -185,7 +190,7 @@ export class PaymentService {
       
       // Cria o reembolso no Mercado Pago
       const refundAmount = data.amount || payment.amount;
-      
+            
       const response = await refundClient.create({
         payment_id: data.paymentId,
         body: {
