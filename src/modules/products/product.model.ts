@@ -16,7 +16,7 @@ export const ProductModel = {
     name: t.String(),
     description: t.Optional(t.String()),
     price: t.Number(),
-    imageUrl: t.Optional(t.String()),
+    imageUrl: t.Optional(t.Nullable(t.String())),
     categoryId: t.String(),
     isAvailable: t.Optional(t.Boolean()),
   }),
@@ -25,7 +25,7 @@ export const ProductModel = {
     name: t.Optional(t.String()),
     description: t.Optional(t.String()),
     price: t.Optional(t.Number()),
-    imageUrl: t.Optional(t.String()),
+    imageUrl: t.Optional(t.Nullable(t.String())),
     categoryId: t.Optional(t.String()),
     isAvailable: t.Optional(t.Boolean()),
   }),
@@ -39,7 +39,7 @@ export type CreateProductInput = {
   name: string;
   description?: string;
   price: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
   categoryId: string;
   isAvailable?: boolean;
 };

@@ -9,6 +9,7 @@ export class ProductRepository {
           select: {
             id: true,
             name: true,
+            isActive: true,
           },
         },
         addons: {
@@ -26,6 +27,36 @@ export class ProductRepository {
     });
   }
 
+  findAllActive() {
+    return prisma.product.findMany({
+      where: {
+        category: {
+          isActive: true,
+        },
+      },
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+          },
+        },
+        addons: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+          },
+        }, 
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
   findById(id: string) {
     return prisma.product.findUnique({
       where: { id },
@@ -34,6 +65,7 @@ export class ProductRepository {
           select: {
             id: true,
             name: true,
+            isActive: true,
           },
         },
         addons: {
@@ -50,12 +82,18 @@ export class ProductRepository {
 
   findByCategory(categoryId: string) {
     return prisma.product.findMany({
-      where: { categoryId },
+      where: { 
+        categoryId,
+        category: {
+          isActive: true,
+        },
+      },
       include: {
         category: {
           select: {
             id: true,
             name: true,
+            isActive: true,
           },
         },
         addons: {

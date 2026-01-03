@@ -7,16 +7,16 @@ const service = new ProductService();
 
 export const products = new Elysia({ prefix: "/products" })
 
-.get(
+  .get(
     "/",
     async () => {
-      return service.getAllProducts();
+      return service.getActiveProducts();
     },
     {
       detail: {
         tags: ["Products"],
-        summary: "Listar todos os produtos",
-        description: "Retorna a lista completa de produtos disponíveis, incluindo informações de categoria, preço e disponibilidade.",
+        summary: "Listar produtos ativos",
+        description: "Retorna a lista de produtos com categorias ativas, disponíveis para visualização pública.",
       },
     }
   )
@@ -42,7 +42,24 @@ export const products = new Elysia({ prefix: "/products" })
     }
   )
 
+  // Aplicar adminGuard para todas as rotas abaixo (já que é adm)
   .use(adminGuard)
+
+  // Endpoint admin - retorna todos os produtos
+  .get(
+    "/all",
+    async () => {
+      return service.getAllProducts();
+    },
+    {
+      detail: {
+        tags: ["Products"],
+        summary: "Listar todos os produtos (Admin)",
+        description: "Retorna todos os produtos, incluindo os de categorias inativas. Requer autenticação de administrador.",
+        security: [{ bearerAuth: [] }],
+      },
+    }
+  )
   
   .post(
     "/",
