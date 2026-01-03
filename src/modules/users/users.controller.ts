@@ -1,13 +1,14 @@
 import { Elysia, t } from "elysia"
 import { CreateUserInput, UsersModel } from "./model"
 import { UsersService } from "./users.service"
+import { adminGuard, authMiddleware } from "../../middlewares/auth.middleware"
 
 const service = new UsersService()
 
 export const users = new Elysia({ prefix: "/users" })
+  .use(adminGuard)
   .get(
     "/",
-    // @ts-expect-error - Elysia middleware type inference issue
     async ({ user }) => {
       console.log("User autenticado:", user)
       return service.getAllUsers()
@@ -45,7 +46,6 @@ export const users = new Elysia({ prefix: "/users" })
 
   .get(
     "/:id",
-    // @ts-expect-error - Elysia middleware type inference issue
     async ({ params: { id }, user, set }) => {
       console.log("User autenticado:", user)
       const foundUser = await service.getUserById(id)
