@@ -27,6 +27,21 @@ export class ProductRepository {
     });
   }
 
+  getAllAddons() {
+    return prisma.addon.findMany({
+      where: { isActive: true },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      }
+    });
+  }
+
+
   findAllActive() {
     return prisma.product.findMany({
       where: {
