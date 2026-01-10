@@ -234,6 +234,20 @@ export const products = new Elysia({ prefix: "/products" })
     }
   )
 
+  .get(
+    "/addons",
+    async () => {
+      return service.getAllAddons();
+    },
+    {
+      detail: {
+        tags: ["Products"],
+        summary: "Listar todos os addons",
+        description: "Retorna todos os adicionais/complementos disponíveis no sistema.",
+      },
+    }
+  )
+
   .delete(
     "/addons/:addonId",
     async ({ params, set }: { params: { addonId: string }; set: any }) => {

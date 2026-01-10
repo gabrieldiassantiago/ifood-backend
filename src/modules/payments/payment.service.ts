@@ -19,6 +19,7 @@ export class PaymentService {
   async createPixPayment(data: CreatePaymentInput): Promise<PaymentPixData> {
 
     const existingPayment = await this.repository.findByOrderId(data.orderId);
+    
     if (existingPayment) {
       throw new PaymentAlreadyExistsError(data.orderId);
     }
