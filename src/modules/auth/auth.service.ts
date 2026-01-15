@@ -1,3 +1,4 @@
+import { uuid, uuidv4 } from "zod";
 import { AuthRepository } from "./auth.repository";
 
 export class AuthService {
@@ -5,50 +6,50 @@ export class AuthService {
         private authRepository: AuthRepository = new AuthRepository()
     ) {}
 
-   async loginByPhone(phone: string, password: string) {
-    const user = await this.authRepository.findByPhone(phone);
+    async loginByPhone(phone: string, pass: string, jwt: any, ipAddress: string, deviceInfo: any) {
 
-    if (!user) {
-        throw new Error("Telefone ou senha inválidos");
+        const user = await this.authRepository.findByPhone(phone);
+
+        if (!user || !(await Bun.password.verify(pass, user.password))) {
+            throw new Error("Telefone ou senha inválidos");
+        }
+
+        const token = await jwt.sign({
+            id: user.id,
+            phone: user.phone,
+            role: user.role
+        });
+
+        const refreshToken = crypto.randomUUID();
+
+        const expiresAt = new Date();
+        
+        expiresAt.setDate(expiresAt.getDate() + 30); 
+
+       await this.authRepository.createRefreshToken(
+            user.id, 
+            refreshToken, 
+            expiresAt,
+            JSON.stringify(deviceInfo),  
+            ipAddress
+        );
+
+        return { token, refreshToken };
     }
 
-    const isPasswordValid = await Bun.password.verify(password, user.password);
+    async loginAdmin(email: string, pass: string, jwt: any) {
+        const user = await this.authRepository.findByEmail(email);
 
-    if (!isPasswordValid) {
-        throw new Error("Telefone ou senha inválidos");
+        if (!user || user.role !== "ADMIN" || !(await Bun.password.verify(pass, user.password))) {
+            throw new Error("Email ou senha inválidos");
+        }
+
+        const token = await jwt.sign({
+            id: user.id,
+            email: user.email,
+            role: user.role
+        });
+
+        return { token, user };
     }
-
-    return {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        role: user.role
-    };
-}
-
-async loginAdmin(email: string, password: string) {
-
-    const user = await this.authRepository.findByEmail(email);
-
-    if (!user || user.role !== "ADMIN") {
-        throw new Error("Email ou senha inválidos"); //melhorar aqui ainda
-    }
-
-    const isPasswordValid = await Bun.password.verify(password, user.password);
-
-    if (!isPasswordValid) {
-        throw new Error("Email ou senha inválidos");
-    }
-    
-    return {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        role: user.role
-    };
-
-}
-
 }
