@@ -1,95 +1,47 @@
-import { Elysia, t } from "elysia";
+// auth.controller.ts
+import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import { AuthService } from "./auth.service";
+import { LoginByPhoneSchema, LoginAdminSchema, AuthResponseSchema, AuthErrorSchema } from "./auth.schemas";
+
+const authService = new AuthService(); 
 
 export const auth = new Elysia({ prefix: "/auth" })
     .use(
         jwt({
             name: "jwt",
-            secret: 'secreto',
+            secret: process.env.JWT_SECRET || 'secreto', 
             exp: "7d" 
         })
     )
+
     .post(
         "/login",
-        async ({ jwt, body, set }) => {
+        async ({ jwt, body, set }) => { 
             try {
-                const authService = new AuthService();
-                
-                const user = await authService.loginByPhone(
-                    body.phone,
-                    body.password
-                );
-
-                const token = await jwt.sign({
-                    id: user.id,
-                    phone: user.phone,
-                    role: user.role
-                });
-
-                return {
-                    token,
-                    user
-                };
-            } catch (error) {
+                return await authService.loginByPhone(body.phone, body.password, jwt);
+            } catch (e: any) {
                 set.status = 401;
-                return {
-                    error: error instanceof Error ? error.message : "Authentication failed"
-                };
+                return { error: e.message };
             }
         },
         {
-            body: t.Object({
-                phone: t.String(),
-                password: t.String()
-            }),
-            detail: {
-                tags: ["Auth"],
-                summary: "Login de usuário",
-                description: "Autentica um usuário usando telefone e senha. Retorna um token JWT válido por 7 dias.",
-            }
+            body: LoginByPhoneSchema,
+            response: { 200: AuthResponseSchema, 401: AuthErrorSchema }
         }
     )
     .post(
         "/admin/login",
         async ({ jwt, body, set }) => {
             try {
-
-                const authService = new AuthService();
-                
-                const user = await authService.loginAdmin(
-                    body.email,
-                    body.password
-                );
-
-                const token = await jwt.sign({
-                    id: user.id,
-                    email: user.email,
-                    role: user.role
-                });
-
-                return {
-                    token,
-                    user
-                };
-            } catch (error) {
+                return await authService.loginAdmin(body.email, body.password, jwt);
+            } catch (e: any) {
                 set.status = 401;
-                return {
-                    error: error instanceof Error ? error.message : "Authentication failed"
-                };
+                return { error: e.message };
             }
         },
         {
-            body: t.Object({
-                email: t.String(),
-                password: t.String()
-            }),
-            detail: {
-                tags: ["Auth"],
-                summary: "Login de administrador",
-                description: "Autentica um administrador usando email e senha. Retorna um token JWT válido por 7 dias.",
-            }
+            body: LoginAdminSchema,
+            response: { 200: AuthResponseSchema, 401: AuthErrorSchema }
         }
-    )
-    ;
-    
+    );
