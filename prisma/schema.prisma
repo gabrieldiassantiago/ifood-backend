@@ -13,6 +13,7 @@ enum Role {
 }
 
 enum OrderStatus {
+  PENDING
   PENDING_PAYMENT
   CREATED
   CONFIRMED
@@ -45,6 +46,8 @@ model User {
   phone     String @unique
   email     String? @unique
   password  String
+
+  refreshTokens RefreshToken[]
 
   address   Address[]
   orders    Order[]
@@ -109,6 +112,23 @@ model Addon {
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  deviceInfo String?  
+  ipAddress  String?
+  
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 model Order {
