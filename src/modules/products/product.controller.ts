@@ -1,6 +1,14 @@
 import { Elysia, t } from "elysia";
 import { ProductService } from "./product.service";
-import { ProductModel, CreateProductInput, UpdateProductInput } from "./product.model";
+import { 
+  ProductModel, 
+  CreateProductInput, 
+  UpdateProductInput,
+  ProductResponseSchema,
+  CreateProductSchema,
+  UpdateProductSchema,
+  ErrorResponseSchema
+} from "./product.model";
 import { adminGuard } from "../../middlewares/auth.middleware";
 
 const service = new ProductService();
@@ -34,6 +42,9 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
+      }),
       detail: {
         tags: ["Products"],
         summary: "Buscar produto por ID",
@@ -52,6 +63,9 @@ export const products = new Elysia({ prefix: "/products" })
       return service.getAllProducts();
     },
     {
+      response: {
+        200: t.Array(ProductResponseSchema),
+      },
       detail: {
         tags: ["Products"],
         summary: "Listar todos os produtos (Admin)",
@@ -74,7 +88,7 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
-      body: ProductModel.create,
+      body: CreateProductSchema,
       detail: {
         tags: ["Products"],
         summary: "Criar produto (Admin)",
@@ -105,7 +119,14 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
-      body: ProductModel.update,
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
+      }),
+      body: UpdateProductSchema,
+      response: {
+        200: ProductResponseSchema,
+        400: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Atualizar produto (Admin)",
@@ -128,6 +149,13 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
+      }),
+      response: {
+        200: ProductResponseSchema,
+        404: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Toggle disponibilidade (Admin)",
@@ -151,6 +179,13 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
+      }),
+      response: {
+        200: t.Object({ message: t.String() }),
+        404: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Deletar produto (Admin)",
@@ -173,10 +208,17 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
-      body: t.Object({
-        name: t.String(),
-        price: t.Number({ minimum: 0.01 }),
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
       }),
+      body: t.Object({
+        name: t.String({ description: "Nome do adicional" }),
+        price: t.Number({ minimum: 0.01, description: "Preço do adicional" }),
+      }),
+      response: {
+        200: t.Any(),
+        400: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Adicionar addon a produto (Admin)",
@@ -199,6 +241,13 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
+      params: t.Object({
+        id: t.String({ description: "ID do produto" }),
+      }),
+      response: {
+        200: t.Any(),
+        404: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Listar addons de produto",
@@ -220,11 +269,18 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
-      body: t.Object({
-        name: t.Optional(t.String()),
-        price: t.Optional(t.Number({ minimum: 0.01 })),
-        isActive: t.Optional(t.Boolean()),
+      params: t.Object({
+        addonId: t.String({ description: "ID do adicional" }),
       }),
+      body: t.Object({
+        name: t.Optional(t.String({ description: "Nome do adicional" })),
+        price: t.Optional(t.Number({ minimum: 0.01, description: "Preço do adicional" })),
+        isActive: t.Optional(t.Boolean({ description: "Status de ativação" })),
+      }),
+      response: {
+        200: t.Any(),
+        400: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Atualizar addon (Admin)",
@@ -240,6 +296,9 @@ export const products = new Elysia({ prefix: "/products" })
       return service.getAllAddons();
     },
     {
+      response: {
+        200: t.Any(),
+      },
       detail: {
         tags: ["Products"],
         summary: "Listar todos os addons",
@@ -262,6 +321,13 @@ export const products = new Elysia({ prefix: "/products" })
       }
     },
     {
+      params: t.Object({
+        addonId: t.String({ description: "ID do adicional" }),
+      }),
+      response: {
+        200: t.Object({ message: t.String() }),
+        404: ErrorResponseSchema,
+      },
       detail: {
         tags: ["Products"],
         summary: "Deletar addon (Admin)",
