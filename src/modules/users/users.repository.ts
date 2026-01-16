@@ -7,7 +7,7 @@ export class UsersRepository {
         return prisma.user.create({
             data: {
                 ...data,
-                role: data.role || "USER"
+                role: "USER"
             }
         })
     }

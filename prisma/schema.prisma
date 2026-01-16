@@ -200,7 +200,6 @@ model Address {
 model Payment {
   id        String @id @default(uuid())
   
-  // Mercado Pago fields
   paymentId          String? @unique  // ID do pagamento no Mercado Pago
   qrCode             String?          // QR Code para PIX
   qrCodeBase64       String?          // QR Code em base64
@@ -210,7 +209,6 @@ model Payment {
   status             PaymentStatus @default(PENDING)
   paymentMethod      PaymentMethod
   
-  // Additional info
   externalReference  String?          // Referência externa
   description        String?
   
