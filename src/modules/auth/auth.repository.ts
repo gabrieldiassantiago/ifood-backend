@@ -25,4 +25,30 @@ export class AuthRepository {
             where: { email }
         })
     }
+
+      createRefreshToken(
+        userId: string, 
+        tokenHash: string, 
+        expiresAt: Date, 
+        deviceInfo?: string, 
+        ipAddress?: string
+    ) {
+        return prisma.refreshToken.create({
+            data: {
+                userId,
+                token: tokenHash,  
+                expiresAt,
+                deviceInfo,
+                ipAddress,
+            },
+        });
+    }
+
+    findRefreshToken(token: string) {
+        return prisma.refreshToken.findUnique({
+            where: { token },
+        });
+    }
+
+    
 }
