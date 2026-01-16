@@ -29,6 +29,7 @@ export const users = new Elysia({ prefix: "/users" })
   .post(
     "/",
     async ({body}) => {
+      
       const newUser = await service.createUser(body as CreateUserInput)
       return newUser
     },

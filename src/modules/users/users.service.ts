@@ -30,6 +30,7 @@ export class UsersService {
         if (existingUserByPhone) {
             throw new Error("Número de telefone já em uso");
         }
+        
 
        const hashedPassword = await Bun.password.hash(data.password, {
         algorithm: "bcrypt",
