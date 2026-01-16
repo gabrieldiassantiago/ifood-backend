@@ -1,26 +1,27 @@
 import { Elysia, t } from "elysia"
-import { CreateUserInput, UsersModel } from "./model"
+import { CreateUserInput, CreateUserSchema, UserResponseSchema, ErrorResponseSchema } from "./model"
 import { UsersService } from "./users.service"
-import { adminGuard, authMiddleware } from "../../middlewares/auth.middleware"
+import { adminGuard } from "../../middlewares/auth.middleware"
+import z from "zod"
 
 const service = new UsersService()
 
 export const users = new Elysia({ prefix: "/users" })
-  .use(adminGuard)
+
   .get(
     "/",
-    async ({ user }) => {
-      console.log("User autenticado:", user)
+    async () => {
       return service.getAllUsers()
     },
     {
       response: {
-        200: t.Array(UsersModel.response),
+       200: z.array(UserResponseSchema),
       },
       detail: {
         tags: ["Users"],
         summary: "Listar todos os usuários",
-        description: "Retorna uma lista de todos os usuários cadastrados",
+        description: "Retorna uma lista de todos os usuários cadastrados no sistema. Requer autenticação como ADMIN.",
+        security: [{ bearerAuth: [] }],
       },
     }
   )
@@ -32,13 +33,16 @@ export const users = new Elysia({ prefix: "/users" })
       return newUser
     },
     {
+      body: CreateUserSchema,
       response: {
-        200: UsersModel.response,
+        200: UserResponseSchema,
+        400: ErrorResponseSchema,
       },
       detail: {
         tags: ["Users"],
         summary: "Criar um novo usuário",
-        description: "Cadastra um novo usuário no sistema",
+        description: "Cadastra um novo usuário no sistema. Requer autenticação como ADMIN.",
+        security: [{ bearerAuth: [] }],
       }
     }
   )
@@ -46,8 +50,7 @@ export const users = new Elysia({ prefix: "/users" })
 
   .get(
     "/:id",
-    async ({ params: { id }, user, set }) => {
-      console.log("User autenticado:", user)
+    async ({ params: { id }, set }) => {
       const foundUser = await service.getUserById(id)
 
       if (!foundUser) {
@@ -58,15 +61,19 @@ export const users = new Elysia({ prefix: "/users" })
       return foundUser
     },
     {
+      params: t.Object({
+        id: t.String({ description: "ID único do usuário" }),
+      }),
       response: {
-        200: UsersModel.response,
-        404: UsersModel.errorResponse,
+        200: UserResponseSchema,
+        404: ErrorResponseSchema,
       },
       detail: {
         tags: ["Users"],
         summary: "Buscar usuário por ID",
-        description: "Retorna os dados de um usuário específico",
+        description: "Retorna os dados de um usuário específico pelo ID. Requer autenticação como ADMIN.",
+        security: [{ bearerAuth: [] }],
       },
     }
-  )
+  ) 
 

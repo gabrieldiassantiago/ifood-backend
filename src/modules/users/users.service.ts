@@ -39,6 +39,7 @@ export class UsersService {
        const newUser = await this.usersRepository.create({
         ...data,
         password: hashedPassword,
+        
        })
        return newUser;
 
