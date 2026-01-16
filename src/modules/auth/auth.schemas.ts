@@ -19,7 +19,8 @@ export const LoginAdminSchema = z.object({
 })
 
 export const AuthResponseSchema = z.object({
-  token: z.string().describe("Token JWT para autenticação")
+  token: z.string().describe("Token JWT para autenticação"),
+    refreshToken: z.string().describe("Token de atualização para obter novos tokens JWT"),
 })
 
 export const AuthErrorSchema = z.object({

@@ -6,7 +6,7 @@ export class AuthService {
         private authRepository: AuthRepository = new AuthRepository()
     ) {}
 
-    async loginByPhone(phone: string, pass: string, jwt: any, ipAddress: string, deviceInfo: any) {
+    async login(phone: string, pass: string, jwt: any, ipAddress: string, deviceInfo: any) {
 
         const user = await this.authRepository.findByPhone(phone);
 
@@ -23,7 +23,7 @@ export class AuthService {
         const refreshToken = crypto.randomUUID();
 
         const expiresAt = new Date();
-        
+
         expiresAt.setDate(expiresAt.getDate() + 30); 
 
        await this.authRepository.createRefreshToken(
@@ -37,19 +37,27 @@ export class AuthService {
         return { token, refreshToken };
     }
 
-    async loginAdmin(email: string, pass: string, jwt: any) {
-        const user = await this.authRepository.findByEmail(email);
+    async refreshAccessToken(refreshToken: string, jwt: any) {
+        const tokenData = await this.authRepository.findRefreshToken(refreshToken);
 
-        if (!user || user.role !== "ADMIN" || !(await Bun.password.verify(pass, user.password))) {
-            throw new Error("Email ou senha inválidos");
+        if (!tokenData || tokenData.expiresAt < new Date()) {
+            throw new Error("Refresh token inválido ou expirado");
         }
 
-        const token = await jwt.sign({
+        const user = await this.authRepository.findById(tokenData.userId);
+
+        if (!user) {
+            throw new Error("Usuário não encontrado");
+        }
+
+        const newToken = await jwt.sign({
             id: user.id,
-            email: user.email,
+            phone: user.phone,
             role: user.role
         });
 
-        return { token, user };
+        return { token: newToken };
+
     }
+
 }
