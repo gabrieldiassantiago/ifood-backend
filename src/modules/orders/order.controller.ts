@@ -10,7 +10,6 @@ const paymentService = new PaymentService();
 export const orders = new Elysia({ prefix: "/orders" })
   .use(authMiddleware)
   
-  // Criar pedido (sem pagamento - para CASH, CREDIT_CARD, DEBIT_CARD)
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -18,6 +17,7 @@ export const orders = new Elysia({ prefix: "/orders" })
         userId: user.id,
         addressId: body.addressId,
         deliveryDistrict: body.deliveryDistrict,
+        deliveryType: body.deliveryType,
         paymentMethod: body.paymentMethod,
         changeFor: body.changeFor,
         observation: body.observation,
@@ -33,6 +33,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       body: t.Object({
         addressId: t.String(),
         deliveryDistrict: t.String(),
+        deliveryType: t.Optional(t.Union([t.Literal('DELIVERY'), t.Literal('PICKUP')])),
         paymentMethod: t.Enum(PaymentMethod),
         changeFor: t.Optional(t.Number()),
         observation: t.Optional(t.String()),
@@ -69,6 +70,7 @@ export const orders = new Elysia({ prefix: "/orders" })
         userId: user.id,
         addressId: body.addressId,
         deliveryDistrict: body.deliveryDistrict,
+        deliveryType: body.deliveryType,
         paymentMethod: PaymentMethod.PIX,
         observation: body.observation,
         items: body.items,
@@ -95,6 +97,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       body: t.Object({
         addressId: t.String(),
         deliveryDistrict: t.String(),
+        deliveryType: t.Optional(t.Union([t.Literal('DELIVERY'), t.Literal('PICKUP')])),
         observation: t.Optional(t.String()),
         items: t.Array(
           t.Object({
