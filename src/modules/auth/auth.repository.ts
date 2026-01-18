@@ -20,6 +20,7 @@ export class AuthRepository {
             },
         })
     }
+    
     findByEmail(email: string) {
         return prisma.user.findUnique({
             where: { email }
@@ -33,6 +34,7 @@ export class AuthRepository {
         deviceInfo?: string, 
         ipAddress?: string
     ) {
+
         return prisma.refreshToken.create({
             data: {
                 userId,
@@ -42,6 +44,7 @@ export class AuthRepository {
                 ipAddress,
             },
         });
+        
     }
 
     findRefreshToken(token: string) {
