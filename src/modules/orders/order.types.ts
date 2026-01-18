@@ -1,9 +1,10 @@
-import { OrderStatus, PaymentMethod } from "../../../generated/prisma/enums";
+import { OrderStatus, PaymentMethod, DeliveryType } from "../../../generated/prisma/enums";
 
 export interface CreateOrderInput {
   userId: string;
   addressId: string;
   deliveryDistrict: string;
+  deliveryType?: DeliveryType;
   paymentMethod: PaymentMethod;
   changeFor?: number;
   observation?: string;
