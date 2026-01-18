@@ -38,6 +38,11 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum DeliveryType {
+  DELIVERY
+  PICKUP
+}
+
 model User {
   id        String @id @default(uuid())
   role      Role   @default(USER)
@@ -139,6 +144,7 @@ model Order {
   deliveryFee   Float
   total         Float
 
+  deliveryType     DeliveryType @default(DELIVERY)
   deliveryDistrict String
 
   paymentMethod PaymentMethod
