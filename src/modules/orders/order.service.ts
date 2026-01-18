@@ -11,6 +11,7 @@ import {
 } from "./errors/order.errors";
 import { OrderStatus } from "../../../generated/prisma/enums";
 import { PaymentService } from "../payments/payment.service";
+import { wsService } from "../websocket/websocket.service";
 
 export class OrderService {
   constructor(
@@ -22,6 +23,10 @@ export class OrderService {
 
     if (!data.items || data.items.length === 0) {
       throw new InvalidOrderItemError("Pedido deve conter pelo menos um item");
+    }
+    
+    if (!data.deliveryType) {
+      data.deliveryType = 'DELIVERY';
     }
 
     for (const item of data.items) {
@@ -49,38 +54,73 @@ export class OrderService {
 
     // Calcular subtotal
     let subtotal = 0;
+    
+    for (const item of data.items) {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        // Preço do produto * quantidade
+        subtotal += product.price * item.quantity;
+        
+        // Somar preço dos addons
+        if (item.addons && item.addons.length > 0) {
+          const addonsTotal = item.addons.reduce((sum, addon) => sum + addon.price, 0);
+          subtotal += addonsTotal * item.quantity;
+        }
+      }
+    }
 
-    const deliveryFee = await prisma.deliveryFee.findFirst({
-      where: {
-        district: data.deliveryDistrict,
-        isActive: true,
-      },
-    });
+    let deliveryFeeValue = 0;
+  
+    
+    if (data.deliveryType === 'PICKUP') {
+      deliveryFeeValue = 0;
+    } else {
+      console.log('📦 DELIVERY - buscando taxa de entrega para:', data.deliveryDistrict);
+      const deliveryFee = await prisma.deliveryFee.findFirst({
+        where: {
+          district: data.deliveryDistrict,
+          isActive: true,
+        },
+      });
 
-    if (!deliveryFee) {
-      throw new DeliveryFeeNotFoundError(data.deliveryDistrict);
+      if (!deliveryFee) {
+        throw new DeliveryFeeNotFoundError(data.deliveryDistrict);
+      }
+      
+      deliveryFeeValue = deliveryFee.price;
+      console.log('💰 Taxa de entrega encontrada:', deliveryFeeValue);
     }
 
     // Calcular total
-    const total = subtotal + deliveryFee.price;
+    const total = subtotal + deliveryFeeValue;
 
     if (data.paymentMethod === "CASH") {
-      if (data.changeFor && data.changeFor < total) {
 
+      if (data.changeFor && data.changeFor < total) {
         throw new Error("Valor para troco é insuficiente para o total do pedido");
       }
       
     }
 
-    // Criar pedido
+    const initialStatus = data.paymentMethod === 'PIX' 
+      ? OrderStatus.PENDING_PAYMENT 
+      : OrderStatus.PENDING;
+    
     const order = await this.repository.create({
       ...data,
       items: data.items,
       subtotal,
-      deliveryFee: deliveryFee.price,
+      deliveryFee: deliveryFeeValue,
       total,
+      status: initialStatus,
+      deliveryType: data.deliveryType || 'DELIVERY',
     });
 
+    wsService.broadcastToAdmins("order:created", {
+      orderId: order.id,
+      order: order,
+      message: "Novo pedido recebido!",
+    });
 
     return order;
   }
@@ -110,23 +150,127 @@ export class OrderService {
   async updateOrderStatus(id: string, status: OrderStatus) {
     await this.getOrderById(id);
 
-    return this.repository.updateStatus(id, status);
+    const updatedOrder = await this.repository.updateStatus(id, status);
+
+    wsService.broadcastToAdmins("order:status_updated", {
+      orderId: id,
+      status: status,
+      order: updatedOrder,
+    });
+
+    // Notificar o cliente dono do pedido
+    if (updatedOrder.userId) {
+      wsService.sendToUser(updatedOrder.userId, "order:status_updated", {
+        orderId: id,
+        newStatus: status,
+        order: updatedOrder,
+      });
+    }
+
+    if (updatedOrder.paymentMethod === "PIX" && status === OrderStatus.CANCELLED) {
+      try {
+
+        const payment = await this.paymentService.getPaymentByOrderId(id);
+
+        if (payment && payment.status === "APPROVED" && payment.paymentId) {
+          await this.paymentService.refundPayment({
+            paymentId: payment.paymentId,
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao processar reembolso:", error);
+        throw new Error("Falha ao processar reembolso do pagamento PIX");
+      }
+    } 
+    
+
+    // Notificar o cliente dono do pedido
+    if (updatedOrder.userId) {
+      wsService.sendToUser(updatedOrder.userId, "order:status_updated", {
+        orderId: id,
+        status: status,
+        message: `Seu pedido foi atualizado para: ${status}`,
+      });
+    }
+
+    return updatedOrder;
+  }
+
+  async confirmPixPayment(orderId: string) {
+    const order = await this.getOrderById(orderId);
+
+    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+      throw new Error('Apenas pedidos com pagamento pendente podem ser confirmados');
+    }
+
+    if (order.paymentMethod !== 'PIX') {
+      throw new Error('Apenas pedidos PIX podem ser confirmados por este método');
+    }
+
+    const updatedOrder = await this.repository.updateStatus(orderId, OrderStatus.PENDING);
+
+    // Emitir evento de novo pedido para admins agora que foi pago
+    wsService.broadcastToAdmins('order:created', {
+      orderId: updatedOrder.id,
+      order: updatedOrder,
+      message: 'Novo pedido recebido (PIX confirmado)!',
+    });
+
+    // Notificar o cliente
+    if (updatedOrder.userId) {
+      wsService.sendToUser(updatedOrder.userId, 'order:payment_confirmed', {
+        orderId: updatedOrder.id,
+        message: 'Pagamento confirmado! Seu pedido está sendo preparado.',
+      });
+    }
+
+    return updatedOrder;
   }
 
   async cancelOrder(id: string) {
     const order = await this.getOrderById(id);
 
-    if (order.status !== OrderStatus.CREATED) {
-      throw new InvalidOrderItemError("Apenas pedidos com status CREATED podem ser cancelados");
+    // Não permite cancelar pedidos já entregues ou já cancelados
+    if (order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) {
+      throw new InvalidOrderItemError(`Pedidos com status ${order.status} não podem ser cancelados`);
     }
 
+    // Reembolsar pagamento PIX se foi aprovado
     if (order.paymentMethod === "PIX") {
-      
-      //falta implementar estorno via paymentService
-      
+      try {
+        const payment = await this.paymentService.getPaymentByOrderId(id);
+        
+        if (payment && payment.status === 'APPROVED' && payment.paymentId) {
+          
+         await this.paymentService.refundPayment({
+            paymentId: payment.paymentId,
+          });
+
+        } else {
+        throw new Error('Pagamento PIX não aprovado ou inexistente, não é possível reembolsar');
+        }
+      } catch (error) {
+        throw new Error('Falha ao processar reembolso do pagamento PIX');
+      }
     }
 
-    return this.repository.updateStatus(id, OrderStatus.CANCELLED);
+    const cancelledOrder = await this.repository.updateStatus(id, OrderStatus.CANCELLED);
+
+    // Notificar o cliente
+    if (cancelledOrder.userId) {
+      wsService.sendToUser(cancelledOrder.userId, 'order:cancelled', {
+        orderId: id,
+        message: 'Seu pedido foi cancelado.',
+      });
+    }
+
+    // Notificar admins
+    wsService.broadcastToAdmins('order:cancelled', {
+      orderId: id,
+      order: cancelledOrder,
+    });
+
+    return cancelledOrder;
   }
 
   async calculateOrderSummary(
