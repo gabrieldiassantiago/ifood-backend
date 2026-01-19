@@ -114,6 +114,7 @@ export class OrderService {
       total,
       status: initialStatus,
       deliveryType: data.deliveryType || 'DELIVERY',
+      observation: data.observation || undefined,
     });
 
     wsService.broadcastToAdmins("order:created", {
