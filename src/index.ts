@@ -14,7 +14,8 @@ import { uploadController } from "./modules/upload/upload.controller";
 import { configureMercadoPago } from "./config/mercadopago.config";
 import { store } from "./modules/store/store.controller";
 import { websocket } from "./modules/websocket/websocket.controller";
-import { z } from "zod";  
+import { z } from "zod"; 
+ 
 try {
   configureMercadoPago();
   console.log(" Mercado Pago configurado com sucesso");
