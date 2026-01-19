@@ -23,6 +23,7 @@ enum OrderStatus {
   CANCELLED
 }
 
+
 enum PaymentMethod {
   CASH
   CREDIT_CARD
@@ -170,6 +171,7 @@ model OrderItem {
   id       String @id @default(uuid())
   quantity Int
   price    Float
+  observation String?
 
   orderId  String
   order    Order   @relation(fields: [orderId], references: [id])

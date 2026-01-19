@@ -67,7 +67,7 @@ export class OrderRepository {
     return prisma.order.findUnique({
       where: { id },
       include: {
-        user: true,
+        
         address: true,
         items: {
           include: {
