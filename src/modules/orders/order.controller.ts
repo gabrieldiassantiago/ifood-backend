@@ -41,6 +41,7 @@ export const orders = new Elysia({ prefix: "/orders" })
           t.Object({
             productId: t.String(),
             quantity: t.Number(),
+            observation: t.Optional(t.String()),
             addons: t.Optional(
               t.Array(
                 t.Object({
@@ -103,6 +104,7 @@ export const orders = new Elysia({ prefix: "/orders" })
           t.Object({
             productId: t.String(),
             quantity: t.Number(),
+            observation: t.Optional(t.String()),
             addons: t.Optional(
               t.Array(
                 t.Object({

@@ -3,30 +3,49 @@ import { OrderStatus } from "../../../generated/prisma/enums";
 import { CreateOrderInput } from "./order.types";
 
 export class OrderRepository {
-  async create(data: CreateOrderInput & { subtotal: number; deliveryFee: number; total: number }) {
+  async create(data: CreateOrderInput & { subtotal: number; deliveryFee: number; total: number; status?: OrderStatus; deliveryType?: string }) {
     return prisma.order.create({
       data: {
         userId: data.userId,
         addressId: data.addressId,
         deliveryDistrict: data.deliveryDistrict,
+        deliveryType: data.deliveryType as any || 'DELIVERY',
         paymentMethod: data.paymentMethod,
         changeFor: data.changeFor,
         observation: data.observation,
         subtotal: data.subtotal,
         deliveryFee: data.deliveryFee,
         total: data.total,
-        status: OrderStatus.CREATED,
+        status: data.status,
         items: {
-          create: data.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: 0, // Será calculado no service
-            addons: {
-              create: item.addons?.map((addon) => ({
-                name: addon.name,
-                price: addon.price,
-              })) || [],
-            },
+          create: await Promise.all(data.items.map(async (item) => {
+
+            const product = await prisma.product.findUnique({
+              where: { id: item.productId },
+            });
+            
+            if (!product) {
+              throw new Error(`Produto ${item.productId} não encontrado`);
+            }
+            
+            let addonsTotal = 0;
+            if (item.addons && item.addons.length > 0) {
+              addonsTotal = item.addons.reduce((sum, addon) => sum + addon.price, 0);
+            }
+            const itemPrice = (product.price + addonsTotal) * item.quantity;
+            
+            return {
+              productId: item.productId,
+              quantity: item.quantity,
+              observation: item.observation || undefined,
+              price: itemPrice,
+              addons: {
+                create: item.addons?.map((addon) => ({
+                  name: addon.name,
+                  price: addon.price,
+                })) || [],
+              },
+            };
           })),
         },
       },

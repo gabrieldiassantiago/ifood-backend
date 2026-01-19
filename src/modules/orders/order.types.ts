@@ -15,6 +15,7 @@ export interface OrderItemInput {
   productId: string;
   quantity: number;
   addons?: OrderItemAddonInput[];
+  observation?: string;
 }
 
 export interface OrderItemAddonInput {
