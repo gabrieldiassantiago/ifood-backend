@@ -228,18 +228,23 @@ export class OrderService {
     return updatedOrder;
   }
 
-  async cancelOrder(id: string) {
-    const order = await this.getOrderById(id);
+  async cancelOrder(orderId: string) {
+    const order = await this.getOrderById(orderId);
 
     // Não permite cancelar pedidos já entregues ou já cancelados
     if (order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) {
       throw new InvalidOrderItemError(`Pedidos com status ${order.status} não podem ser cancelados`);
     }
+    
+    //nao deve permitir cancelar pedidos ja em processo de cancelamento
+    if (order.status === OrderStatus.PENDING_CANCELLATION) {
+      throw new InvalidOrderItemError(`Pedidos com status ${order.status} já estão em processo de cancelamento`);
+    }
 
     // Reembolsar pagamento PIX se foi aprovado
     if (order.paymentMethod === "PIX") {
       try {
-        const payment = await this.paymentService.getPaymentByOrderId(id);
+        const payment = await this.paymentService.getPaymentByOrderId(orderId);
         
         if (payment && payment.status === 'APPROVED' && payment.paymentId) {
           
@@ -255,19 +260,19 @@ export class OrderService {
       }
     }
 
-    const cancelledOrder = await this.repository.updateStatus(id, OrderStatus.CANCELLED);
+    const cancelledOrder = await this.repository.updateStatus(orderId, OrderStatus.PENDING_CANCELLATION);
 
     // Notificar o cliente
     if (cancelledOrder.userId) {
       wsService.sendToUser(cancelledOrder.userId, 'order:cancelled', {
-        orderId: id,
-        message: 'Seu pedido foi cancelado.',
+        orderId: orderId,
+        message: 'Seu pedido está em processo de cancelamento.',
       });
     }
 
     // Notificar admins
     wsService.broadcastToAdmins('order:cancelled', {
-      orderId: id,
+      orderId: orderId,
       order: cancelledOrder,
     });
 
@@ -325,4 +330,30 @@ export class OrderService {
     await this.getOrderById(id);
     return this.repository.delete(id);
   }
+
+  async sendCancelationConfirmation(orderId: string) {
+    const order = await this.getOrderById(orderId);
+
+    if (order.status !== OrderStatus.PENDING_CANCELLATION) {
+      throw new Error('Apenas pedidos com cancelamento pendente podem ser confirmados');
+    }
+
+    const updatedOrder = await this.repository.updateStatus(orderId, OrderStatus.CANCELLED);
+    // Notificar o cliente
+    if (updatedOrder.userId) {
+      wsService.sendToUser(updatedOrder.userId, 'order:cancelled', {
+        orderId: updatedOrder.id,
+        message: 'Seu pedido foi cancelado conforme solicitado.',
+      });
+    }
+
+    // Notificar admins
+    wsService.broadcastToAdmins('order:cancelled', {
+      orderId: updatedOrder.id,
+      order: updatedOrder,
+    });
+
+    return updatedOrder;
+  }
+
 }
