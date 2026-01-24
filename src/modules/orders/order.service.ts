@@ -36,21 +36,25 @@ export class OrderService {
     }
 
     const productIds = data.items.map((item) => item.productId);
+    
+    const uniqueProductsIds = [...new Set(productIds)];
+
+
     const products = await prisma.product.findMany({
       where: {
-        id: { in: productIds },
+        id: { in: uniqueProductsIds },
       },
     });
 
-    if (products.length !== productIds.length) {
-      throw new InvalidOrderItemError("Um ou mais produtos não foram encontrados");
-    }
+     if (products.length !== uniqueProductsIds.length) {
+    throw new InvalidOrderItemError("Um ou mais produtos não foram encontrados");
+  }
 
-    for (const product of products) {
-      if (!product.isAvailable) {
-        throw new ProductNotAvailableError(product.id);
-      }
+      for (const product of products) {
+    if (!product.isAvailable) {
+      throw new ProductNotAvailableError(product.id);
     }
+  }
 
     // Calcular subtotal
     let subtotal = 0;
@@ -285,9 +289,10 @@ export class OrderService {
   ): Promise<OrderSummary> {
 
     const productIds = items.map((item) => item.productId);
+    const uniqueProductsIds = [...new Set(productIds)];
     const products = await prisma.product.findMany({
       where: {
-        id: { in: productIds },
+        id: { in: uniqueProductsIds },
       },
     });
 
