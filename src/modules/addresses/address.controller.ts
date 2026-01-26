@@ -1,13 +1,10 @@
 import { Elysia, t } from "elysia";
-import { authMiddleware } from "../../middlewares/auth.middleware";
 import { AddressService } from "./address.service";
 
 const service = new AddressService();
 
 export const addresses = new Elysia({ prefix: "/addresses" })
-  .use(authMiddleware)
   
-  // Criar endereço
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -46,7 +43,6 @@ export const addresses = new Elysia({ prefix: "/addresses" })
     }
   )
 
-  // Listar endereços do usuário
   .get(
     "/",
     async ({ user }: any) => {
@@ -67,7 +63,6 @@ export const addresses = new Elysia({ prefix: "/addresses" })
     }
   )
 
-  // Deletar endereço
   .delete(
     "/:id",
     async ({ params, user }: any) => {
