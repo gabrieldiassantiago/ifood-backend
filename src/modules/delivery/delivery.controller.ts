@@ -32,7 +32,6 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  // Buscar taxa de entrega por bairro (público)
   .get(
     "/districts/:district",
     async ({ params, set }: any) => {
@@ -59,10 +58,8 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  // Aplicar guard de admin para rotas administrativas
   .use(adminGuard)
 
-  // Listar todos os bairros (admin)
   .get(
     "/",
     async ({ set }: any) => {
