@@ -1,9 +1,13 @@
 import { Elysia, t } from "elysia";
 import { CategoryService } from "./category.service";
+import { authMacro } from "../../middlewares/auth.macro";
 
 const service = new CategoryService();
 
 export const categories = new Elysia({ prefix: "/categories" })
+
+  .use(authMacro)
+
   .get(
     "/",
     async () => {
@@ -55,6 +59,7 @@ export const categories = new Elysia({ prefix: "/categories" })
       }
     },
     {
+      isAdmin: true,
       body: t.Object({
         name: t.String({ minLength: 1 }),
         order: t.Optional(t.Number()),
@@ -82,6 +87,7 @@ export const categories = new Elysia({ prefix: "/categories" })
       params: t.Object({
         id: t.String(),
       }),
+      isAdmin: true,
       body: t.Object({
         name: t.Optional(t.String({ minLength: 1 })),
         order: t.Optional(t.Number()),
@@ -107,6 +113,7 @@ export const categories = new Elysia({ prefix: "/categories" })
       }
     },
     {
+      isAdmin: true,
       params: t.Object({
         id: t.String(),
       }),
@@ -130,6 +137,7 @@ export const categories = new Elysia({ prefix: "/categories" })
       }
     },
     {
+      isAdmin: true,
       params: t.Object({
         id: t.String(),
       }),
