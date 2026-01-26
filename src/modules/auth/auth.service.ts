@@ -17,7 +17,9 @@ export class AuthService {
         const token = await jwt.sign({
             id: user.id,
             phone: user.phone,
-            role: user.role
+            role: user.role,
+            name: user.name,
+            email: user.email
         });
 
         const refreshToken = crypto.randomUUID();
