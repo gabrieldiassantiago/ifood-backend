@@ -3,14 +3,26 @@ import { OrderService } from "./order.service";
 import { PaymentService } from "../payments/payment.service";
 import { authMacro } from "../../middlewares/auth.macro";
 import { OrderStatus, PaymentMethod } from "../../../generated/prisma/enums";
+import { cache } from '@nowarajs/elysia-cache'
 
 const orderService = new OrderService();
 const paymentService = new PaymentService();
 
+function toInt(v: unknown, fallback: number) {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  return fallback;
+}
+
+const paginationQuery = t.Object({
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),  // max 100
+  offset: t.Optional(t.Numeric({ minimum: 0, maximum: 100000 })),
+});
+
+
 export const orders = new Elysia({ prefix: "/orders" })
 
   .use(authMacro)
-  
+   .use(cache())
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -197,14 +209,20 @@ export const orders = new Elysia({ prefix: "/orders" })
   // Listar pedidos do usuário
   .get(
     "/user/me",
-    async ({ user }: any) => {
-      const orders = await orderService.getOrdersByUserId(user.id);
+    async ({ user, query }: any) => {
+
+      const limit = toInt(query.limit, 20);
+      const offset = toInt(query.offset, 0);
+
+      const orders = await orderService.getOrdersByUserId(user.id, limit, offset);
       return {
         success: true,
         data: orders,
       };
     },
     {
+      isCached: { ttl: 240 }, // 4 minutos de cache
+
       detail: {
         tags: ["Orders"],
         summary: "Listar meus pedidos",
@@ -214,29 +232,28 @@ export const orders = new Elysia({ prefix: "/orders" })
     }
   )
 
-  // Listar todos os pedidos (apenas admin)
   .get(
-    "/",
-    async ({ user }: any) => {
-      if (user.role !== "ADMIN") {
-        throw new Error("Acesso negado");
-      }
+  "/user/me",
+  async ({ user, query }: any) => {
+    const limit = toInt(query.limit, 20);
+    const offset = toInt(query.offset, 0);
 
-      const orders = await orderService.getAllOrders();
-      return {
-        success: true,
-        data: orders,
-      };
+    const orders = await orderService.getOrdersByUserId(user.id, limit, offset);
+
+    return { success: true, data: orders };
+  },
+  {
+    isAuth: true,
+    query: paginationQuery,
+    detail: {
+      tags: ["Orders"],
+      summary: "Listar meus pedidos",
+      description: "Retorna pedidos do usuário autenticado com paginação (?limit=&offset=).",
+      security: [{ bearerAuth: [] }],
     },
-    {
-      detail: {
-        tags: ["Orders"],
-        summary: "Listar todos os pedidos (Admin)",
-        description: "Retorna todos os pedidos do sistema. Requer autenticação de administrador.",
-        security: [{ bearerAuth: [] }],
-      },
-    }
-  )
+  }
+)
+
 
   // Listar pedidos por status (apenas admin)
   .get(
