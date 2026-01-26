@@ -1,14 +1,15 @@
 import { Elysia, t } from "elysia";
 import { OrderService } from "./order.service";
 import { PaymentService } from "../payments/payment.service";
-import { authMiddleware } from "../../middlewares/auth.middleware";
+import { authMacro } from "../../middlewares/auth.macro";
 import { OrderStatus, PaymentMethod } from "../../../generated/prisma/enums";
 
 const orderService = new OrderService();
 const paymentService = new PaymentService();
 
 export const orders = new Elysia({ prefix: "/orders" })
-  .use(authMiddleware)
+
+  .use(authMacro)
   
   .post(
     "/",
@@ -30,6 +31,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       };
     },
     {
+      isAuth: true,
       body: t.Object({
         addressId: t.String(),
         deliveryDistrict: t.String(),
@@ -182,6 +184,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       };
     },
     {
+      isAuth: true,
       detail: {
         tags: ["Orders"],
         summary: "Buscar pedido por ID",
@@ -292,7 +295,6 @@ export const orders = new Elysia({ prefix: "/orders" })
     async ({ params, user }: any) => {
       const order = await orderService.getOrderById(params.id);
       
-      // Apenas o usuário dono do pedido ou admin pode cancelar
       if (user.role !== "ADMIN" && order.userId !== user.id) {
         throw new Error("Acesso negado");
       }
