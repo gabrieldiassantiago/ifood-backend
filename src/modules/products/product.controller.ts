@@ -10,21 +10,24 @@ import {
   ErrorResponseSchema
 } from "./product.model";
 import { adminGuard } from "../../middlewares/auth.middleware";
+import { cache } from '@nowarajs/elysia-cache'
 
 const service = new ProductService();
 
 export const products = new Elysia({ prefix: "/products" })
 
+  .use(cache())
+
   .get(
     "/",
-    async () => {
-      return service.getActiveProducts();
-    },
+    async () => service.getActiveProducts(),
     {
+      isCached: { ttl: 240 }, // 4 minutos de cache
       detail: {
         tags: ["Products"],
         summary: "Listar produtos ativos",
-        description: "Retorna a lista de produtos com categorias ativas, disponíveis para visualização pública.",
+        description:
+          "Retorna a lista de produtos com categorias ativas, disponíveis para visualização pública.",
       },
     }
   )
@@ -53,10 +56,8 @@ export const products = new Elysia({ prefix: "/products" })
     }
   )
 
-  // Aplicar adminGuard para todas as rotas abaixo (já que é adm)
   .use(adminGuard)
 
-  // Endpoint admin - retorna todos os produtos
   .get(
     "/all",
     async () => {
