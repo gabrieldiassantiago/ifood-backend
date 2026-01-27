@@ -3,11 +3,11 @@ import { prisma } from "../../../prisma/db";
 export class CategoryRepository {
   async findAll() {
     return prisma.category.findMany({
-      orderBy: { order: 'asc' },
-      include: {
-        _count: {
-          select: { products: true }
-        }
+      where: {isActive: true},
+      select: {
+        id: true,
+        name: true,
+        order: true,
       }
     });
   }
