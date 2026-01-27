@@ -1,10 +1,14 @@
 import { Elysia, t } from "elysia";
 import { AddressService } from "./address.service";
+import { authMacro } from "../../middlewares/auth.macro";
+import { cache } from '@nowarajs/elysia-cache'
 
 const service = new AddressService();
 
 export const addresses = new Elysia({ prefix: "/addresses" })
+  .use(authMacro)
   
+  // Criar endereço
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -27,6 +31,7 @@ export const addresses = new Elysia({ prefix: "/addresses" })
       }
     },
     {
+      isAuth: true,
       body: t.Object({
         street: t.String(),
         number: t.String(),
@@ -43,9 +48,11 @@ export const addresses = new Elysia({ prefix: "/addresses" })
     }
   )
 
+  // Listar endereços do usuário
   .get(
     "/",
     async ({ user }: any) => {
+
       const addresses = await service.getUserAddresses(user.id);
 
       return {
@@ -54,6 +61,8 @@ export const addresses = new Elysia({ prefix: "/addresses" })
       };
     },
     {
+      isAuth: true,
+       isCached: { ttl: 240 }, // 4 minutos de cache
       detail: {
         tags: ["Addresses"],
         summary: "Listar meus endereços",
@@ -63,6 +72,7 @@ export const addresses = new Elysia({ prefix: "/addresses" })
     }
   )
 
+  // Deletar endereço
   .delete(
     "/:id",
     async ({ params, user }: any) => {
