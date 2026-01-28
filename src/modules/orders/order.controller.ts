@@ -14,15 +14,14 @@ function toInt(v: unknown, fallback: number) {
 }
 
 const paginationQuery = t.Object({
-  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),  // max 100
+  limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
   offset: t.Optional(t.Numeric({ minimum: 0, maximum: 100000 })),
 });
 
-
 export const orders = new Elysia({ prefix: "/orders" })
-
   .use(authMacro)
-   .use(cache())
+  .use(cache())
+  
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -36,7 +35,6 @@ export const orders = new Elysia({ prefix: "/orders" })
         observation: body.observation,
         items: body.items,
       });
-
       return {
         success: true,
         data: order,
@@ -75,12 +73,10 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-
-  // Criar pedido com PIX (cria pedido + pagamento)
+  
   .post(
     "/with-pix",
     async ({ body, user }: any) => {
-      // 1. Criar o pedido
       const order = await orderService.createOrder({
         userId: user.id,
         addressId: body.addressId,
@@ -91,7 +87,6 @@ export const orders = new Elysia({ prefix: "/orders" })
         items: body.items,
       });
 
-      // 2. Criar o pagamento PIX
       const pixData = await paymentService.createPixPayment({
         orderId: order.id,
         amount: order.total,
@@ -109,6 +104,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       };
     },
     {
+      isAuth: true,
       body: t.Object({
         addressId: t.String(),
         deliveryDistrict: t.String(),
@@ -138,8 +134,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-
-  // Calcular resumo do pedido (antes de criar)
+  
   .post(
     "/calculate",
     async ({ body }: any) => {
@@ -147,7 +142,6 @@ export const orders = new Elysia({ prefix: "/orders" })
         body.items,
         body.deliveryDistrict
       );
-
       return {
         success: true,
         data: summary,
@@ -174,22 +168,72 @@ export const orders = new Elysia({ prefix: "/orders" })
         tags: ["Orders"],
         summary: "Calcular resumo do pedido",
         description: "Calcula o valor total do pedido incluindo taxa de entrega antes de finalizar a compra.",
+      },
+    }
+  )
+    
+  .get(
+    "/me",
+    async ({ user, query }: any) => {
+      const limit = toInt(query.limit, 20);
+      const offset = toInt(query.offset, 0);
+      const orders = await orderService.getOrdersByUserId(user.id, limit, offset);
+      return { success: true, data: orders };
+    },
+    {
+      isAuth: true,
+      query: paginationQuery,
+      detail: {
+        tags: ["Orders"],
+        summary: "Listar meus pedidos",
+        description: "Retorna pedidos do usuário autenticado com paginação (?limit=&offset=).",
         security: [{ bearerAuth: [] }],
       },
     }
   )
-
-  // Buscar pedido por ID
+  
+  .get(
+    "/status/:status",
+    async ({ params, user }: any) => {
+      if (user.role !== "ADMIN") {
+        throw new Error("Acesso negado");
+      }
+      
+      const validStatuses = Object.values(OrderStatus);
+      if (!validStatuses.includes(params.status as OrderStatus)) {
+        throw new Error(`Status inválido. Valores válidos: ${validStatuses.join(', ')}`);
+      }
+      
+      const orders = await orderService.getOrdersByStatus(params.status as OrderStatus);
+      return {
+        success: true,
+        data: orders,
+      };
+    },
+    {
+      isAuth: true,
+      params: t.Object({
+        status: t.Enum(OrderStatus),
+      }),
+      detail: {
+        tags: ["Orders"],
+        summary: "Listar pedidos por status (Admin)",
+        description: "Retorna todos os pedidos com um determinado status (PENDING, CONFIRMED, PREPARING, etc). Requer autenticação de administrador.",
+        security: [{ bearerAuth: [] }],
+      },
+    }
+  )
+  
+  
   .get(
     "/:id",
     async ({ params, user }: any) => {
       const order = await orderService.getOrderById(params.id);
       
-      // Usuários comuns só podem ver seus próprios pedidos
       if (user.role !== "ADMIN" && order.userId !== user.id) {
         throw new Error("Acesso negado");
       }
-
+      
       return {
         success: true,
         data: order,
@@ -205,88 +249,15 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-
-  // Listar pedidos do usuário
-  .get(
-    "/user/me",
-    async ({ user, query }: any) => {
-
-      const limit = toInt(query.limit, 20);
-      const offset = toInt(query.offset, 0);
-
-      const orders = await orderService.getOrdersByUserId(user.id, limit, offset);
-      return {
-        success: true,
-        data: orders,
-      };
-    },
-    {
-      isCached: { ttl: 240 }, // 4 minutos de cache
-
-      detail: {
-        tags: ["Orders"],
-        summary: "Listar meus pedidos",
-        description: "Retorna todos os pedidos do usuário autenticado.",
-        security: [{ bearerAuth: [] }],
-      },
-    }
-  )
-
-  .get(
-  "/user/me",
-  async ({ user, query }: any) => {
-    const limit = toInt(query.limit, 20);
-    const offset = toInt(query.offset, 0);
-
-    const orders = await orderService.getOrdersByUserId(user.id, limit, offset);
-
-    return { success: true, data: orders };
-  },
-  {
-    isAuth: true,
-    query: paginationQuery,
-    detail: {
-      tags: ["Orders"],
-      summary: "Listar meus pedidos",
-      description: "Retorna pedidos do usuário autenticado com paginação (?limit=&offset=).",
-      security: [{ bearerAuth: [] }],
-    },
-  }
-)
-
-
-  // Listar pedidos por status (apenas admin)
-  .get(
-    "/status/:status",
-    async ({ params, user }: any) => {
-      if (user.role !== "ADMIN") {
-        throw new Error("Acesso negado");
-      }
-
-      const orders = await orderService.getOrdersByStatus(params.status as OrderStatus);
-      return {
-        success: true,
-        data: orders,
-      };
-    },
-    {
-      detail: {
-        tags: ["Orders"],
-        summary: "Listar pedidos por status (Admin)",
-        description: "Retorna todos os pedidos com um determinado status (PENDING, CONFIRMED, PREPARING, etc). Requer autenticação de administrador.",
-        security: [{ bearerAuth: [] }],
-      },
-    }
-  )
-
-  // Atualizar status do pedido (apenas admin)
+  
+  
   .patch(
     "/:id/status",
     async ({ params, body, user }: any) => {
       if (user.role !== "ADMIN") {
         throw new Error("Acesso negado");
       }
-
+      
       const order = await orderService.updateOrderStatus(params.id, body.status);
       return {
         success: true,
@@ -294,6 +265,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       };
     },
     {
+      isAuth: true,
       body: t.Object({
         status: t.Enum(OrderStatus),
       }),
@@ -306,7 +278,6 @@ export const orders = new Elysia({ prefix: "/orders" })
     }
   )
 
-  // Cancelar pedido
   .delete(
     "/:id",
     async ({ params, user }: any) => {
@@ -315,7 +286,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       if (user.role !== "ADMIN" && order.userId !== user.id) {
         throw new Error("Acesso negado");
       }
-
+      
       const cancelledOrder = await orderService.cancelOrder(params.id);
       return {
         success: true,
@@ -323,6 +294,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       };
     },
     {
+      isAuth: true,
       detail: {
         tags: ["Orders"],
         summary: "Cancelar pedido",
@@ -330,4 +302,4 @@ export const orders = new Elysia({ prefix: "/orders" })
         security: [{ bearerAuth: [] }],
       },
     }
-  )
+  );
