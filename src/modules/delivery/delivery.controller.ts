@@ -1,19 +1,17 @@
 import { Elysia, t } from "elysia";
-import { adminGuard } from "../../middlewares/auth.middleware";
 import { DeliveryService } from "./delivery.service";
+import { authMacro } from "../../middlewares/auth.macro";
 
 const service = new DeliveryService();
 
 export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
   
-  // Listar todos os bairros (público)
   .get(
     "/districts",
     async () => {
       try {
         const districts = await service.getActiveDistricts();
         return {
-          success: true,
           data: districts,
         };
       } catch (error) {
@@ -58,7 +56,7 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  .use(adminGuard)
+  .use(authMacro)
 
   .get(
     "/",
@@ -106,6 +104,7 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
       }
     },
     {
+      isAdmin: true,
       body: t.Object({
         district: t.String({ minLength: 1 }),
         price: t.Number({ minimum: 0 }),
@@ -120,7 +119,6 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  // Atualizar bairro (admin)
   .patch(
     "/:id",
     async ({ params, body, set }: any) => {
@@ -139,6 +137,7 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
       }
     },
     {
+      isAdmin: true,
       body: t.Object({
         district: t.Optional(t.String({ minLength: 1 })),
         price: t.Optional(t.Number({ minimum: 0 })),
@@ -153,7 +152,6 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  // Alternar status do bairro (admin)
   .patch(
     "/:id/toggle",
     async ({ params, set }: any) => {
@@ -171,7 +169,9 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
         };
       }
     },
+    
     {
+      isAdmin: true,
       detail: {
         tags: ["Delivery"],
         summary: "Alternar status do bairro (Admin)",
@@ -181,7 +181,6 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
     }
   )
 
-  // Deletar bairro (admin)
   .delete(
     "/:id",
     async ({ params, set }: any) => {
@@ -200,6 +199,7 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
       }
     },
     {
+      isAdmin: true,
       detail: {
         tags: ["Delivery"],
         summary: "Deletar bairro (Admin)",
