@@ -21,6 +21,7 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+  PENDING_CANCELLATION
 }
 
 
@@ -57,6 +58,7 @@ model User {
 
   address   Address[]
   orders    Order[]
+  messages  Message[]
 
   points    Int    @default(0)
 
@@ -155,11 +157,12 @@ model Order {
   userId    String
   user      User   @relation(fields: [userId], references: [id])
 
-  addressId String
-  address   Address @relation(fields: [addressId], references: [id])
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id])
 
   items     OrderItem[]
   payment   Payment?
+  messages  Message[]
 
   createdAt DateTime @default(now())
 
@@ -228,4 +231,19 @@ model Payment {
 
   @@index([status])
   @@index([paymentId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
