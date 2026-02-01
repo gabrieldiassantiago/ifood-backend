@@ -1,32 +1,25 @@
 import { OrderRepository } from "./order.repository";
 import { CreateOrderInput, OrderSummary } from "./order.types";
+import { OrderStatus } from "../../../generated/prisma/enums";
 import { prisma } from "../../../prisma/db";
+import { Prisma } from "../../../generated/prisma/client";
+
 import {
-  OrderNotFoundError,
   InvalidOrderItemError,
-  ProductNotAvailableError,
   InvalidQuantityError,
   DeliveryFeeNotFoundError,
-  PaymentRequiredError,
+  OrderNotFoundError
 } from "./errors/order.errors";
-import { OrderStatus } from "../../../generated/prisma/enums";
-import { PaymentService } from "../payments/payment.service";
 import { wsService } from "../websocket/websocket.service";
 
 export class OrderService {
   constructor(
-    private repository: OrderRepository = new OrderRepository(),
-    private paymentService: PaymentService = new PaymentService(),
-  ) {}
+    private repository: OrderRepository = new OrderRepository()
+  ) { }
 
   async createOrder(data: CreateOrderInput) {
-
-    if (!data.items || data.items.length === 0) {
-      throw new InvalidOrderItemError("Pedido deve conter pelo menos um item");
-    }
-    
-    if (!data.deliveryType) {
-      data.deliveryType = 'DELIVERY';
+    if (!data.items.length) {
+      throw new InvalidOrderItemError("Pedido sem itens");
     }
 
     for (const item of data.items) {
@@ -35,330 +28,167 @@ export class OrderService {
       }
     }
 
-    const productIds = data.items.map((item) => item.productId);
-    
-    const uniqueProductsIds = [...new Set(productIds)];
-
-
     const products = await prisma.product.findMany({
-      where: {
-        id: { in: uniqueProductsIds },
-      },
+      where: { id: { in: data.items.map(i => i.productId) } }
     });
 
-     if (products.length !== uniqueProductsIds.length) {
-    throw new InvalidOrderItemError("Um ou mais produtos não foram encontrados");
-  }
-
-      for (const product of products) {
-    if (!product.isAvailable) {
-      throw new ProductNotAvailableError(product.id);
+    if (products.length !== data.items.length) {
+      throw new InvalidOrderItemError("Produto não encontrado");
     }
-  }
 
-    // Calcular subtotal
     let subtotal = 0;
-    
-    for (const item of data.items) {
-      const product = products.find(p => p.id === item.productId);
-      if (product) {
-        // Preço do produto * quantidade
-        subtotal += product.price * item.quantity;
-        
-        // Somar preço dos addons
-        if (item.addons && item.addons.length > 0) {
-          const addonsTotal = item.addons.reduce((sum, addon) => sum + addon.price, 0);
-          subtotal += addonsTotal * item.quantity;
-        }
-      }
-    }
 
-    let deliveryFeeValue = 0;
-  
-    
-    if (data.deliveryType === 'PICKUP') {
-      deliveryFeeValue = 0;
-    } else {
-      console.log('📦 DELIVERY - buscando taxa de entrega para:', data.deliveryDistrict);
-      const deliveryFee = await prisma.deliveryFee.findFirst({
+    const itemsCreate = data.items.map(item => {
+      const product = products.find(p => p.id === item.productId)!;
+
+      const addonsTotal =
+        item.addons?.reduce((s, a) => s + a.price, 0) ?? 0;
+
+      const price = (product.price + addonsTotal) * item.quantity;
+      subtotal += price;
+
+      return {
+        product: { connect: { id: product.id } },
+        quantity: item.quantity,
+        observation: item.observation,
+        price,
+        addons: {
+          create: item.addons?.map(a => ({
+            name: a.name,
+            price: a.price
+          })) ?? []
+        }
+      };
+    });
+
+    let deliveryFee = 0;
+
+    if (data.deliveryType === "DELIVERY") {
+      const fee = await prisma.deliveryFee.findFirst({
         where: {
           district: data.deliveryDistrict,
-          isActive: true,
-        },
+          isActive: true
+        }
       });
 
-      if (!deliveryFee) {
+      if (!fee) {
         throw new DeliveryFeeNotFoundError(data.deliveryDistrict);
       }
-      
-      deliveryFeeValue = deliveryFee.price;
-      console.log('💰 Taxa de entrega encontrada:', deliveryFeeValue);
+
+      deliveryFee = fee.price;
     }
 
-    // Calcular total
-    const total = subtotal + deliveryFeeValue;
+    const total = subtotal + deliveryFee;
 
-    if (data.paymentMethod === "CASH") {
-
-      if (data.changeFor && data.changeFor < total) {
-        throw new Error("Valor para troco é insuficiente para o total do pedido");
+    if (data.paymentMethod === "CASH" && data.changeFor !== undefined) {
+      if (data.changeFor < total) {
+        throw new Error(`O valor para troco (R$ ${data.changeFor.toFixed(2)}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2)})`);
       }
-      
     }
 
-    const initialStatus = data.paymentMethod === 'PIX' 
-      ? OrderStatus.PENDING_PAYMENT 
-      : OrderStatus.PENDING;
-    
-    const order = await this.repository.create({
-      ...data,
-      items: data.items,
-      subtotal,
-      deliveryFee: deliveryFeeValue,
-      total,
-      status: initialStatus,
-      deliveryType: data.deliveryType || 'DELIVERY',
-      observation: data.observation || undefined,
-    });
+    const status =
+      data.paymentMethod === "PIX"
+        ? OrderStatus.PENDING_PAYMENT
+        : OrderStatus.PENDING;
 
-    wsService.broadcastToAdmins("order:created", {
-      orderId: order.id,
-      order: order,
-      message: "Novo pedido recebido!",
-    });
+    const orderData: Prisma.OrderCreateInput = {
+      user: { connect: { id: data.userId } },
+      deliveryDistrict: data.deliveryDistrict,
+      deliveryType: data.deliveryType,
+      paymentMethod: data.paymentMethod,
+      changeFor: data.changeFor,
+      observation: data.observation,
+      subtotal,
+      deliveryFee,
+      total,
+      status,
+      items: { create: itemsCreate }
+    };
+
+    if (data.deliveryType === "DELIVERY") {
+      orderData.address = {
+        connect: { id: data.addressId }
+      };
+    }
+
+    const order = await this.repository.create(orderData);
+
+    wsService.broadcastToAdmins("order:created", { order });
 
     return order;
   }
 
   async getOrderById(id: string) {
     const order = await this.repository.findById(id);
-
-    if (!order) {
-      throw new OrderNotFoundError(id);
-    }
-
+    if (!order) throw new OrderNotFoundError(id);
     return order;
   }
 
-  async getOrdersByUserId(userId: string) {
-    return this.repository.findByUserId(userId);
+  async getOrdersByUserId(userId: string, limit?: number, offset?: number) {
+    return this.repository.findByUserId(userId, limit, offset);
   }
 
   async getAllOrders() {
     return this.repository.findAll();
   }
 
-  async getOrdersByStatus(status: OrderStatus) {
+  async getOrdersByStatus(status: string) {
     return this.repository.findByStatus(status);
   }
 
-  async updateOrderStatus(id: string, status: OrderStatus) {
-    await this.getOrderById(id);
-
-    const updatedOrder = await this.repository.updateStatus(id, status);
-
-    wsService.broadcastToAdmins("order:status_updated", {
-      orderId: id,
-      status: status,
-      order: updatedOrder,
-    });
-
-    // Notificar o cliente dono do pedido
-    if (updatedOrder.userId) {
-      wsService.sendToUser(updatedOrder.userId, "order:status_updated", {
-        orderId: id,
-        newStatus: status,
-        order: updatedOrder,
-      });
-    }
-
-    if (updatedOrder.paymentMethod === "PIX" && status === OrderStatus.CANCELLED) {
-      try {
-
-        const payment = await this.paymentService.getPaymentByOrderId(id);
-
-        if (payment && payment.status === "APPROVED" && payment.paymentId) {
-          await this.paymentService.refundPayment({
-            paymentId: payment.paymentId,
-          });
-        }
-      } catch (error) {
-        console.error("Erro ao processar reembolso:", error);
-        throw new Error("Falha ao processar reembolso do pagamento PIX");
-      }
-    } 
-    
-
-    // Notificar o cliente dono do pedido
-    if (updatedOrder.userId) {
-      wsService.sendToUser(updatedOrder.userId, "order:status_updated", {
-        orderId: id,
-        status: status,
-        message: `Seu pedido foi atualizado para: ${status}`,
-      });
-    }
-
-    return updatedOrder;
+  async updateOrderStatus(id: string, status: string) {
+    return this.repository.updateStatus(id, status);
   }
 
-  async confirmPixPayment(orderId: string) {
-    const order = await this.getOrderById(orderId);
-
-    if (order.status !== OrderStatus.PENDING_PAYMENT) {
-      throw new Error('Apenas pedidos com pagamento pendente podem ser confirmados');
-    }
-
-    if (order.paymentMethod !== 'PIX') {
-      throw new Error('Apenas pedidos PIX podem ser confirmados por este método');
-    }
-
-    const updatedOrder = await this.repository.updateStatus(orderId, OrderStatus.PENDING);
-
-    // Emitir evento de novo pedido para admins agora que foi pago
-    wsService.broadcastToAdmins('order:created', {
-      orderId: updatedOrder.id,
-      order: updatedOrder,
-      message: 'Novo pedido recebido (PIX confirmado)!',
-    });
-
-    // Notificar o cliente
-    if (updatedOrder.userId) {
-      wsService.sendToUser(updatedOrder.userId, 'order:payment_confirmed', {
-        orderId: updatedOrder.id,
-        message: 'Pagamento confirmado! Seu pedido está sendo preparado.',
-      });
-    }
-
-    return updatedOrder;
-  }
-
-  async cancelOrder(orderId: string) {
-    const order = await this.getOrderById(orderId);
-
-    // Não permite cancelar pedidos já entregues ou já cancelados
-    if (order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) {
-      throw new InvalidOrderItemError(`Pedidos com status ${order.status} não podem ser cancelados`);
-    }
-    
-    //nao deve permitir cancelar pedidos ja em processo de cancelamento
-    if (order.status === OrderStatus.PENDING_CANCELLATION) {
-      throw new InvalidOrderItemError(`Pedidos com status ${order.status} já estão em processo de cancelamento`);
-    }
-
-    // Reembolsar pagamento PIX se foi aprovado
-    if (order.paymentMethod === "PIX") {
-      try {
-        const payment = await this.paymentService.getPaymentByOrderId(orderId);
-        
-        if (payment && payment.status === 'APPROVED' && payment.paymentId) {
-          
-         await this.paymentService.refundPayment({
-            paymentId: payment.paymentId,
-          });
-
-        } else {
-        throw new Error('Pagamento PIX não aprovado ou inexistente, não é possível reembolsar');
-        }
-      } catch (error) {
-        throw new Error('Falha ao processar reembolso do pagamento PIX');
-      }
-    }
-
-    const cancelledOrder = await this.repository.updateStatus(orderId, OrderStatus.PENDING_CANCELLATION);
-
-    // Notificar o cliente
-    if (cancelledOrder.userId) {
-      wsService.sendToUser(cancelledOrder.userId, 'order:cancelled', {
-        orderId: orderId,
-        message: 'Seu pedido está em processo de cancelamento.',
-      });
-    }
-
-    // Notificar admins
-    wsService.broadcastToAdmins('order:cancelled', {
-      orderId: orderId,
-      order: cancelledOrder,
-    });
-
-    return cancelledOrder;
+  async deleteOrder(id: string) {
+    return this.repository.delete(id);
   }
 
   async calculateOrderSummary(
     items: Array<{ productId: string; quantity: number; addons?: Array<{ price: number }> }>,
-    deliveryDistrict: string
+    deliveryDistrict: string,
+    deliveryType: "DELIVERY" | "PICKUP" = "DELIVERY"
   ): Promise<OrderSummary> {
 
-    const productIds = items.map((item) => item.productId);
-    const uniqueProductsIds = [...new Set(productIds)];
     const products = await prisma.product.findMany({
-      where: {
-        id: { in: uniqueProductsIds },
-      },
+      where: { id: { in: items.map(i => i.productId) } }
     });
-
-    // Calcular subtotal
 
     let subtotal = 0;
+
     for (const item of items) {
-      const product = products.find((p) => p.id === item.productId);
+      const product = products.find(p => p.id === item.productId);
       if (!product) {
-        throw new InvalidOrderItemError(`Produto ${item.productId} não encontrado`);
+        throw new InvalidOrderItemError("Produto não encontrado");
       }
 
-      const addonsTotal = item.addons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
-      const itemTotal = (product.price + addonsTotal) * item.quantity;
-      subtotal += itemTotal;
+      const addonsTotal =
+        item.addons?.reduce((s, a) => s + a.price, 0) ?? 0;
+
+      subtotal += (product.price + addonsTotal) * item.quantity;
     }
 
-    // Buscar taxa de entrega
-    const deliveryFee = await prisma.deliveryFee.findFirst({
-      where: {
-        district: deliveryDistrict,
-        isActive: true,
-      },
-    });
+    let deliveryFee = 0;
 
-    if (!deliveryFee) {
-      throw new DeliveryFeeNotFoundError(deliveryDistrict);
+    if (deliveryType === "DELIVERY") {
+      const fee = await prisma.deliveryFee.findFirst({
+        where: {
+          district: deliveryDistrict,
+          isActive: true
+        }
+      });
+
+      if (!fee) {
+        throw new DeliveryFeeNotFoundError(deliveryDistrict);
+      }
+
+      deliveryFee = fee.price;
     }
-
-    const total = subtotal + deliveryFee.price;
 
     return {
       subtotal,
-      deliveryFee: deliveryFee.price,
-      total,
+      deliveryFee,
+      total: subtotal + deliveryFee
     };
   }
-
-  async deleteOrder(id: string) {
-    await this.getOrderById(id);
-    return this.repository.delete(id);
-  }
-
-  async sendCancelationConfirmation(orderId: string) {
-    const order = await this.getOrderById(orderId);
-
-    if (order.status !== OrderStatus.PENDING_CANCELLATION) {
-      throw new Error('Apenas pedidos com cancelamento pendente podem ser confirmados');
-    }
-
-    const updatedOrder = await this.repository.updateStatus(orderId, OrderStatus.CANCELLED);
-    // Notificar o cliente
-    if (updatedOrder.userId) {
-      wsService.sendToUser(updatedOrder.userId, 'order:cancelled', {
-        orderId: updatedOrder.id,
-        message: 'Seu pedido foi cancelado conforme solicitado.',
-      });
-    }
-
-    // Notificar admins
-    wsService.broadcastToAdmins('order:cancelled', {
-      orderId: updatedOrder.id,
-      order: updatedOrder,
-    });
-
-    return updatedOrder;
-  }
-
 }
