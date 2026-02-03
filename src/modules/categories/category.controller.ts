@@ -25,14 +25,9 @@ export const categories = new Elysia({ prefix: "/categories" })
 
   .get(
     "/:id",
-    async ({ params: { id }, set }) => {
-      try {
-        const category = await service.getCategoryById(id);
-        return { success: true, data: category };
-      } catch (error) {
-        set.status = 404;
-        return { success: false, error: error instanceof Error ? error.message : "Categoria não encontrada" };
-      }
+    async ({ params: { id } }) => {
+      const category = await service.getCategoryById(id);
+      return { success: true, data: category };
     },
     {
       params: t.Object({
@@ -49,14 +44,9 @@ export const categories = new Elysia({ prefix: "/categories" })
   .post(
     "/",
     async ({ body, set }) => {
-      try {
-        const category = await service.createCategory(body);
-        set.status = 201;
-        return { success: true, data: category };
-      } catch (error) {
-        set.status = 400;
-        return { success: false, error: error instanceof Error ? error.message : "Erro ao criar categoria" };
-      }
+      const category = await service.createCategory(body);
+      set.status = 201;
+      return { success: true, data: category };
     },
     {
       isAdmin: true,
@@ -74,14 +64,9 @@ export const categories = new Elysia({ prefix: "/categories" })
 
   .patch(
     "/:id",
-    async ({ params: { id }, body, set }) => {
-      try {
-        const category = await service.updateCategory(id, body);
-        return { success: true, data: category };
-      } catch (error) {
-        set.status = 400;
-        return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar categoria" };
-      }
+    async ({ params: { id }, body }) => {
+      const category = await service.updateCategory(id, body);
+      return { success: true, data: category };
     },
     {
       params: t.Object({
@@ -103,14 +88,9 @@ export const categories = new Elysia({ prefix: "/categories" })
 
   .patch(
     "/:id/toggle",
-    async ({ params: { id }, set }) => {
-      try {
-        const category = await service.toggleCategoryActive(id);
-        return { success: true, data: category };
-      } catch (error) {
-        set.status = 400;
-        return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar categoria" };
-      }
+    async ({ params: { id } }) => {
+      const category = await service.toggleCategoryActive(id);
+      return { success: true, data: category };
     },
     {
       isAdmin: true,
@@ -127,14 +107,9 @@ export const categories = new Elysia({ prefix: "/categories" })
 
   .delete(
     "/:id",
-    async ({ params: { id }, set }) => {
-      try {
-        await service.deleteCategory(id);
-        return { success: true, message: "Categoria deletada com sucesso" };
-      } catch (error) {
-        set.status = 400;
-        return { success: false, error: error instanceof Error ? error.message : "Erro ao deletar categoria" };
-      }
+    async ({ params: { id } }) => {
+      await service.deleteCategory(id);
+      return { success: true, message: "Categoria deletada com sucesso" };
     },
     {
       isAdmin: true,

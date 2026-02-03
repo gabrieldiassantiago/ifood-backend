@@ -1,4 +1,5 @@
 import { CategoryRepository } from "./category.repository";
+import { CategoryNotFoundError } from "./errors/category.errors";
 
 export class CategoryService {
   private repository = new CategoryRepository();
@@ -10,7 +11,7 @@ export class CategoryService {
   async getCategoryById(id: string) {
     const category = await this.repository.findById(id);
     if (!category) {
-      throw new Error('Categoria não encontrada');
+      throw new CategoryNotFoundError(id);
     }
     return category;
   }
