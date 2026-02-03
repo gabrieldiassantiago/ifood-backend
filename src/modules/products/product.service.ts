@@ -1,7 +1,6 @@
 import { ProductRepository } from "./product.repository";
 import { CreateProductInput, UpdateProductInput } from "./product.model";
 import { ProductNotFoundError, InvalidPriceError } from "./errors/products.errors";
-import { storage, BUCKET_ID } from "../../config/appwrite.config";
 
 
 function extractFileIdFromUrl(url: string | null): string | null {
@@ -14,16 +13,11 @@ function extractFileIdFromUrl(url: string | null): string | null {
   }
 }
 
-async function deleteAppwriteFile(fileId: string): Promise<void> {
-  try {
-    await storage.deleteFile(BUCKET_ID, fileId);
-  } catch (error: any) {
-  }
-}
+
 
 export class ProductService {
   constructor(
-    private repository: ProductRepository = new ProductRepository()
+    private repository: ProductRepository = new ProductRepository(),
   ) {}
 
   // Retorna todos os produtos (admin)
@@ -51,6 +45,7 @@ export class ProductService {
   }
 
   async createProduct(data: CreateProductInput) {
+
     if (data.price <= 0) {
       throw new InvalidPriceError();
     }
@@ -74,7 +69,6 @@ export class ProductService {
       // Se a imagem foi removida (imageUrl = null ou vazio) ou alterada para outra URL
       if (oldFileId && oldFileId !== newFileId) {
         // Deletar imagem antiga do Appwrite
-        await deleteAppwriteFile(oldFileId);
       }
     }
 
@@ -82,14 +76,12 @@ export class ProductService {
   }
 
   async deleteProduct(id: string) {
+
     const product = await this.getProductById(id);
     
-    // Deletar imagem do Appwrite se existir
     if (product.imageUrl) {
       const fileId = extractFileIdFromUrl(product.imageUrl);
-      if (fileId) {
-        await deleteAppwriteFile(fileId);
-      }
+      
     }
     
     return this.repository.delete(id);
@@ -98,6 +90,10 @@ export class ProductService {
   async toggleAvailability(id: string) {
     const product = await this.getProductById(id);
     return this.repository.update(id, { isAvailable: !product.isAvailable });
+  }
+
+  async getAllAddons() {
+    return this.repository.getAllAddons();
   }
 
   async addAddon(productId: string, data: { name: string; price: number }) {
