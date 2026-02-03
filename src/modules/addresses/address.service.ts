@@ -1,4 +1,5 @@
 import { AddressRepository, CreateAddressInput } from "./address.repository";
+import { AddressNotFoundError, AddressPermissionDeniedError } from "./errors/address.errors";
 
 export class AddressService {
   constructor(
@@ -14,12 +15,11 @@ export class AddressService {
   }
 
   async deleteAddress(id: string, userId: string) {
-    
     // Verificar se o endereço pertence ao usuário
     const address = await this.repository.findByIdAndUserId(id, userId);
 
     if (!address) {
-      throw new Error("Endereço não encontrado ou não pertence ao usuário");
+      throw new AddressPermissionDeniedError();
     }
 
     await this.repository.delete(id);

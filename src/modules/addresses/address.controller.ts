@@ -12,23 +12,19 @@ export const addresses = new Elysia({ prefix: "/addresses" })
   .post(
     "/",
     async ({ body, user }: any) => {
-      try {
-        const address = await service.createAddress({
-          street: body.street,
-          number: body.number,
-          district: body.district,
-          city: body.city,
-          reference: body.reference,
-          userId: user.id,
-        });
+      const address = await service.createAddress({
+        street: body.street,
+        number: body.number,
+        district: body.district,
+        city: body.city,
+        reference: body.reference,
+        userId: user.id,
+      });
 
-        return {
-          success: true,
-          data: address,
-        };
-      } catch (error) {
-        throw error;
-      }
+      return {
+        success: true,
+        data: address,
+      };
     },
     {
       isAuth: true,
@@ -52,7 +48,6 @@ export const addresses = new Elysia({ prefix: "/addresses" })
   .get(
     "/",
     async ({ user }: any) => {
-
       const addresses = await service.getUserAddresses(user.id);
 
       return {
