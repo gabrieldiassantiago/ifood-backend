@@ -1,10 +1,12 @@
 import { Elysia, t } from "elysia";
 import { PaymentService } from "./payment.service";
-import { authMiddleware } from "../../middlewares/auth.middleware";
+import { authMacro } from "../../middlewares/auth.macro";
 
 const paymentService = new PaymentService();
 
 export const payments = new Elysia({ prefix: "/payments" })
+
+  .use(authMacro)
 
 .post(
     "/webhook",
@@ -25,7 +27,7 @@ export const payments = new Elysia({ prefix: "/payments" })
     }
   )
   
-  .use(authMiddleware)
+  .use(authMacro)
   
   // Criar pagamento PIX
   .post(
@@ -49,6 +51,7 @@ export const payments = new Elysia({ prefix: "/payments" })
       }
     },
     {
+      isAuth: true,
       body: t.Object({
         orderId: t.String(),
         amount: t.Number(),
