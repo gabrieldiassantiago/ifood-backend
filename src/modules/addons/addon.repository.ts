@@ -12,4 +12,15 @@ export class AddonRepository {
         });
     }
 
+    create(name: string, price: number, productId: string) {
+        return prisma.addon.create({
+           data: {
+               name,
+               price,
+               product: { connect: { id: productId } },
+           },
+        });
+    }
+
+
 }
