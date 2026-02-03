@@ -1,6 +1,18 @@
 import { Elysia, status } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 
+function getCookie(headers: Headers, name: string) {
+  const cookie = headers.get("cookie");
+  if (!cookie) return null;
+
+  const part = cookie
+    .split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith(name + "="));
+
+  return part ? decodeURIComponent(part.split("=").slice(1).join("=")) : null;
+}
+
 export const authMacro = new Elysia({ name: "authMacro" })
   .use(
     jwt({
@@ -9,22 +21,33 @@ export const authMacro = new Elysia({ name: "authMacro" })
     })
   )
   .macro({
-    isAdmin: {
-      resolve: async ({ jwt, headers }) => {
-        const authHeader = headers.authorization;
+    isAuth: {
+      resolve: async ({ jwt, headers, set }) => {
 
-        if (!authHeader?.startsWith("Bearer "))
-          return status(401, "Missing authorization token");
+        const authHeader = headers["authorization"] || headers["Authorization"];
 
-        const token = authHeader.substring(7);
+        let token =
+          typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+            ? authHeader.slice(7)
+            : null;
+
+        // 2) tenta cookie token=
+        if (!token) token = getCookie(headers as any, "token");
+
+        if (!token) return status(401, "Missing token");
+
         const payload = await jwt.verify(token);
-
         if (!payload) return status(401, "Invalid or expired token");
-        
-        if ((payload as any).role !== "ADMIN")
-          return status(403, "Admin access required");
 
         return { user: payload };
+      },
+    },
+
+    isAdmin: {
+      isAuth: true,
+      resolve: ({ user }: any) => {
+        if ((user as any)?.role !== "ADMIN")
+          return status(403, "Admin access required");
       },
     },
   });
