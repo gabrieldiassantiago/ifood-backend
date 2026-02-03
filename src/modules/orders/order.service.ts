@@ -11,10 +11,12 @@ import {
   OrderNotFoundError
 } from "./errors/order.errors";
 import { wsService } from "../websocket/websocket.service";
+import { PaymentService } from "../payments/payment.service";
 
 export class OrderService {
   constructor(
-    private repository: OrderRepository = new OrderRepository()
+    private repository: OrderRepository = new OrderRepository(),
+    private paymentService: PaymentService = new PaymentService()
   ) { }
 
   async createOrder(data: CreateOrderInput) {
@@ -191,4 +193,19 @@ export class OrderService {
       total: subtotal + deliveryFee
     };
   }
+
+  async cancelOrderPending(orderId: string) {
+    const order = await this.repository.findById(orderId);
+
+    if (!order) {
+      throw new Error("Pedido não encontrado");
+    }
+
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new Error("Pedido já foi cancelado");
+    }
+
+    await this.repository.updateStatus(orderId, OrderStatus.PENDING_CANCELLATION);
+  }
+
 }
