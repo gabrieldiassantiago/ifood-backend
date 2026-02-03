@@ -9,17 +9,10 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
   .get(
     "/districts",
     async () => {
-      try {
-        const districts = await service.getActiveDistricts();
-        return {
-          data: districts,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao buscar bairros",
-        };
-      }
+      const districts = await service.getActiveDistricts();
+      return {
+        data: districts,
+      };
     },
     {
       detail: {
@@ -32,20 +25,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
 
   .get(
     "/districts/:district",
-    async ({ params, set }: any) => {
-      try {
-        const deliveryFee = await service.getFeeByDistrict(params.district);
-        return {
-          success: true,
-          data: deliveryFee,
-        };
-      } catch (error) {
-        set.status = 404;
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : "Erro ao buscar taxa",
-        };
-      }
+    async ({ params }: any) => {
+      const deliveryFee = await service.getFeeByDistrict(params.district);
+      return {
+        success: true,
+        data: deliveryFee,
+      };
     },
     {
       detail: {
@@ -60,20 +45,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
 
   .get(
     "/",
-    async ({ set }: any) => {
-      try {
-        const districts = await service.getAllDistricts();
-        return {
-          success: true,
-          data: districts,
-        };
-      } catch (error) {
-        set.status = 500;
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao buscar bairros",
-        };
-      }
+    async () => {
+      const districts = await service.getAllDistricts();
+      return {
+        success: true,
+        data: districts,
+      };
     },
     {
       detail: {
@@ -88,20 +65,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
   // Criar novo bairro (admin)
   .post(
     "/",
-    async ({ body, set }: any) => {
-      try {
-        const deliveryFee = await service.createDistrict(body);
-        return {
-          success: true,
-          data: deliveryFee,
-        };
-      } catch (error) {
-        set.status = 400;
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao criar bairro",
-        };
-      }
+    async ({ body }: any) => {
+      const deliveryFee = await service.createDistrict(body);
+      return {
+        success: true,
+        data: deliveryFee,
+      };
     },
     {
       isAdmin: true,
@@ -121,20 +90,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
 
   .patch(
     "/:id",
-    async ({ params, body, set }: any) => {
-      try {
-        const deliveryFee = await service.updateDistrict(params.id, body);
-        return {
-          success: true,
-          data: deliveryFee,
-        };
-      } catch (error) {
-        set.status = error instanceof Error && error.message === "Bairro não encontrado" ? 404 : 400;
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao atualizar bairro",
-        };
-      }
+    async ({ params, body }: any) => {
+      const deliveryFee = await service.updateDistrict(params.id, body);
+      return {
+        success: true,
+        data: deliveryFee,
+      };
     },
     {
       isAdmin: true,
@@ -154,20 +115,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
 
   .patch(
     "/:id/toggle",
-    async ({ params, set }: any) => {
-      try {
-        const updated = await service.toggleDistrictStatus(params.id);
-        return {
-          success: true,
-          data: updated,
-        };
-      } catch (error) {
-        set.status = error instanceof Error && error.message === "Bairro não encontrado" ? 404 : 400;
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao atualizar status",
-        };
-      }
+    async ({ params }: any) => {
+      const updated = await service.toggleDistrictStatus(params.id);
+      return {
+        success: true,
+        data: updated,
+      };
     },
     
     {
@@ -183,20 +136,12 @@ export const deliveryFees = new Elysia({ prefix: "/delivery-fees" })
 
   .delete(
     "/:id",
-    async ({ params, set }: any) => {
-      try {
-        await service.deleteDistrict(params.id);
-        return {
-          success: true,
-          message: "Bairro deletado com sucesso",
-        };
-      } catch (error) {
-        set.status = error instanceof Error && error.message === "Bairro não encontrado" ? 404 : 400;
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao deletar bairro",
-        };
-      }
+    async ({ params }: any) => {
+      await service.deleteDistrict(params.id);
+      return {
+        success: true,
+        message: "Bairro deletado com sucesso",
+      };
     },
     {
       isAdmin: true,
