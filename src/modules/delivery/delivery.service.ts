@@ -1,4 +1,5 @@
 import { DeliveryRepository } from "./deliver.repository";
+import { DeliveryFeeNotFoundError, DeliveryFeeAlreadyExistsError, InvalidDeliveryFeeError } from "./errors/delivery.errors";
 
 interface CreateDeliveryFeeInput {
   district: string;
@@ -26,10 +27,11 @@ export class DeliveryService {
 
   // Buscar taxa por bairro (público)
   async getFeeByDistrict(district: string) {
+
     const deliveryFee = await this.repository.findByDistrict(district);
     
     if (!deliveryFee) {
-      throw new Error("Não entregamos neste bairro");
+      throw new DeliveryFeeNotFoundError(district);
     }
 
     return deliveryFee;
@@ -46,12 +48,12 @@ export class DeliveryService {
     const exists = await this.repository.existsByDistrict(data.district);
     
     if (exists) {
-      throw new Error("Já existe um bairro cadastrado com este nome");
+      throw new DeliveryFeeAlreadyExistsError(data.district);
     }
 
     // Validar preço
     if (data.price < 0) {
-      throw new Error("O preço não pode ser negativo");
+      throw new InvalidDeliveryFeeError();
     }
 
     return this.repository.create(data);
@@ -63,12 +65,12 @@ export class DeliveryService {
     const existing = await this.repository.findById(id);
     
     if (!existing) {
-      throw new Error("Bairro não encontrado");
+      throw new DeliveryFeeNotFoundError();
     }
 
     // Validar preço se fornecido
     if (data.price !== undefined && data.price < 0) {
-      throw new Error("O preço não pode ser negativo");
+      throw new InvalidDeliveryFeeError();
     }
 
     return this.repository.update(id, data);
@@ -79,7 +81,7 @@ export class DeliveryService {
     const deliveryFee = await this.repository.findById(id);
 
     if (!deliveryFee) {
-      throw new Error("Bairro não encontrado");
+      throw new DeliveryFeeNotFoundError();
     }
 
     return this.repository.update(id, {
@@ -93,7 +95,7 @@ export class DeliveryService {
     const existing = await this.repository.findById(id);
     
     if (!existing) {
-      throw new Error("Bairro não encontrado");
+      throw new DeliveryFeeNotFoundError();
     }
 
     await this.repository.delete(id);
