@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { jwt } from "@elysiajs/jwt";
 import { AuthService } from "./auth.service";
 import { LoginByPhoneSchema, LoginAdminSchema, AuthResponseSchema, AuthErrorSchema } from "./auth.schemas";
+import { TokenMissingError } from "../users/errors/user.errors";
 
 const authService = new AuthService(); 
 
@@ -19,44 +20,37 @@ export const auth = new Elysia({ prefix: "/auth" })
         "/login",
 
         async ({ jwt, body, set, request, server }) => { 
+            const userAgent = request.headers.get('user-agent') || 'unknown';
+            
+            const ip = server?.requestIP(request);
+            
+            const ipAddress = ip ? 
+                (ip.address === '::1' || ip.address === '127.0.0.1' ? 'localhost' : ip.address) 
+                : 'unknown';
 
-            try {
+            const deviceInfo = {
+                userAgent,
+                platform: request.headers.get('sec-ch-ua-platform') || 'unknown',
+                mobile: request.headers.get('sec-ch-ua-mobile') === '?1',
+            };
 
-                const userAgent = request.headers.get('user-agent') || 'unknown'; //talvez seja irrelevante, mas sei la
-                
-                const ip = server?.requestIP(request);
-                
-                const ipAddress = ip ? 
-                    (ip.address === '::1' || ip.address === '127.0.0.1' ? 'localhost' : ip.address) 
-                    : 'unknown';
+            const result = await authService.login(
+                body.phone, 
+                body.password, 
+                jwt,
+                ipAddress,
+                deviceInfo
+            );
 
-                const deviceInfo = {
-                    userAgent,
-                    platform: request.headers.get('sec-ch-ua-platform') || 'unknown',
-                    mobile: request.headers.get('sec-ch-ua-mobile') === '?1',
-                };
+            set.headers['set-cookie'] = [
+                `refreshToken=${result.refreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=2592000`
+            ].join(', ');
 
-                const result = await authService.login(
-                    body.phone, 
-                    body.password, 
-                    jwt,
-                    ipAddress,
-                    deviceInfo
-                );
-
-                set.headers['set-cookie'] = [
-                    `refreshToken=${result.refreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=2592000`
-                ].join(', ');
-
-                return { 
-                    token: result.token,
-                    refreshToken: result.refreshToken
-                   
-                };
-            } catch (e: any) {
-                set.status = 401;
-                return { error: e.message };
-            }
+            return { 
+                token: result.token,
+                refreshToken: result.refreshToken
+               
+            };
         },
         {
             body: LoginByPhoneSchema,
@@ -65,20 +59,14 @@ export const auth = new Elysia({ prefix: "/auth" })
     )
 
     .post("/refresh",
-    async ({ jwt, headers, set }) => {
-        try {
+    async ({ jwt, headers }) => {
         const refreshToken = headers['cookie']?.match(/refreshToken=([^;]+)/)?.[1];
 
         if (!refreshToken) {
-            throw new Error("Refresh token não fornecido");
+            throw new TokenMissingError();
         }
 
         const result = await authService.refreshAccessToken(refreshToken, jwt);
 
         return result;
-
-        } catch (e: any) {
-            set.status = 401;
-            return { error: e.message };
-        }
     })
