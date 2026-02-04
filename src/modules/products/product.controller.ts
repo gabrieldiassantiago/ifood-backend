@@ -9,14 +9,16 @@ import {
   UpdateProductSchema,
   ErrorResponseSchema
 } from "./product.model";
-import { adminGuard } from "../../middlewares/auth.middleware";
 import { cache } from '@nowarajs/elysia-cache'
+import z from "zod";
+import { authMacro } from "../../middlewares/auth.macro";
 
 const service = new ProductService();
 
 export const products = new Elysia({ prefix: "/products" })
 
   .use(cache())
+  .use(authMacro)
 
   .get(
     "/",
@@ -29,20 +31,13 @@ export const products = new Elysia({ prefix: "/products" })
         description:
           "Retorna a lista de produtos com categorias ativas, disponíveis para visualização pública.",
       },
-    }
+    },
   )
 
   .get(
     "/:id",
-    async ({ params, set }: { params: { id: string }; set: any }) => {
-      try {
-        return await service.getProductById(params.id);
-      } catch (error) {
-        set.status = 404;
-        return {
-          message: error instanceof Error ? error.message : "Product not found",
-        };
-      }
+    async ({ params }: { params: { id: string } }) => {
+      return await service.getProductById(params.id);
     },
     {
       params: t.Object({
@@ -56,39 +51,31 @@ export const products = new Elysia({ prefix: "/products" })
     }
   )
 
-  .use(adminGuard)
-
   .get(
     "/all",
     async () => {
       return service.getAllProducts();
     },
     {
+      isAdmin: true,
       response: {
-        200: t.Array(ProductResponseSchema),
+        200: z.array(ProductResponseSchema),
       },
       detail: {
         tags: ["Products"],
         summary: "Listar todos os produtos (Admin)",
         description: "Retorna todos os produtos, incluindo os de categorias inativas. Requer autenticação de administrador.",
-        security: [{ bearerAuth: [] }],
       },
     }
   )
   
   .post(
     "/",
-    async ({ body, set }: { body: CreateProductInput; set: any }) => {
-      try {
-        return await service.createProduct(body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message: error instanceof Error ? error.message : "Failed to create",
-        };
-      }
+    async ({ body }: { body: CreateProductInput }) => {
+      return await service.createProduct(body);
     },
     {
+      isAdmin: true,
       body: CreateProductSchema,
       detail: {
         tags: ["Products"],
@@ -104,20 +91,11 @@ export const products = new Elysia({ prefix: "/products" })
     async ({
       params,
       body,
-      set,
     }: {
       params: { id: string };
       body: UpdateProductInput;
-      set: any;
     }) => {
-      try {
-        return await service.updateProduct(params.id, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message: error instanceof Error ? error.message : "Failed to update",
-        };
-      }
+      return await service.updateProduct(params.id, body);
     },
     {
       params: t.Object({
@@ -139,15 +117,8 @@ export const products = new Elysia({ prefix: "/products" })
 
   .patch(
     "/:id/toggle",
-    async ({ params, set }: { params: { id: string }; set: any }) => {
-      try {
-        return await service.toggleAvailability(params.id);
-      } catch (error) {
-        set.status = 404;
-        return {
-          message: error instanceof Error ? error.message : "Product not found",
-        };
-      }
+    async ({ params }: { params: { id: string } }) => {
+      return await service.toggleAvailability(params.id);
     },
     {
       params: t.Object({
@@ -168,16 +139,9 @@ export const products = new Elysia({ prefix: "/products" })
 
   .delete(
     "/:id",
-    async ({ params, set }: { params: { id: string }; set: any }) => {
-      try {
-        await service.deleteProduct(params.id);
-        return { message: "Product deleted successfully" };
-      } catch (error) {
-        set.status = 404;
-        return {
-          message: error instanceof Error ? error.message : "Product not found",
-        };
-      }
+    async ({ params }: { params: { id: string } }) => {
+      await service.deleteProduct(params.id);
+      return { message: "Product deleted successfully" };
     },
     {
       params: t.Object({
@@ -198,15 +162,8 @@ export const products = new Elysia({ prefix: "/products" })
 
   .post(
     "/:id/addons",
-    async ({ params, body, set }: { params: { id: string }; body: any; set: any }) => {
-      try {
-        return await service.addAddon(params.id, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message: error instanceof Error ? error.message : "Failed to create addon",
-        };
-      }
+    async ({ params, body }: { params: { id: string }; body: any }) => {
+      return await service.addAddon(params.id, body);
     },
     {
       params: t.Object({
@@ -231,15 +188,8 @@ export const products = new Elysia({ prefix: "/products" })
 
   .get(
     "/:id/addons",
-    async ({ params, set }: { params: { id: string }; set: any }) => {
-      try {
-        return await service.getProductAddons(params.id);
-      } catch (error) {
-        set.status = 404;
-        return {
-          message: error instanceof Error ? error.message : "Product not found",
-        };
-      }
+    async ({ params }: { params: { id: string } }) => {
+      return await service.getProductAddons(params.id);
     },
     {
       params: t.Object({
@@ -259,15 +209,8 @@ export const products = new Elysia({ prefix: "/products" })
 
   .patch(
     "/addons/:addonId",
-    async ({ params, body, set }: { params: { addonId: string }; body: any; set: any }) => {
-      try {
-        return await service.updateAddon(params.addonId, body);
-      } catch (error) {
-        set.status = 400;
-        return {
-          message: error instanceof Error ? error.message : "Failed to update addon",
-        };
-      }
+    async ({ params, body }: { params: { addonId: string }; body: any }) => {
+      return await service.updateAddon(params.addonId, body);
     },
     {
       params: t.Object({
@@ -310,16 +253,9 @@ export const products = new Elysia({ prefix: "/products" })
 
   .delete(
     "/addons/:addonId",
-    async ({ params, set }: { params: { addonId: string }; set: any }) => {
-      try {
-        await service.deleteAddon(params.addonId);
-        return { message: "Addon deleted successfully" };
-      } catch (error) {
-        set.status = 404;
-        return {
-          message: error instanceof Error ? error.message : "Addon not found",
-        };
-      }
+    async ({ params }: { params: { addonId: string } }) => {
+      await service.deleteAddon(params.addonId);
+      return { message: "Addon deleted successfully" };
     },
     {
       params: t.Object({
