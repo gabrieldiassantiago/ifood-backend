@@ -19,9 +19,10 @@ const paginationQuery = t.Object({
 });
 
 export const orders = new Elysia({ prefix: "/orders" })
+
   .use(authMacro)
   .use(cache())
-  
+
   .post(
     "/",
     async ({ body, user }: any) => {
@@ -43,8 +44,8 @@ export const orders = new Elysia({ prefix: "/orders" })
     {
       isAuth: true,
       body: t.Object({
-        addressId: t.String(),
-        deliveryDistrict: t.String(),
+        addressId: t.Optional(t.String()),
+        deliveryDistrict: t.Optional(t.String()),
         deliveryType: t.Optional(t.Union([t.Literal('DELIVERY'), t.Literal('PICKUP')])),
         paymentMethod: t.Enum(PaymentMethod),
         changeFor: t.Optional(t.Number()),
@@ -73,7 +74,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  
+
   .post(
     "/with-pix",
     async ({ body, user }: any) => {
@@ -134,7 +135,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  
+
   .post(
     "/calculate",
     async ({ body }: any) => {
@@ -171,7 +172,7 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-    
+
   .get(
     "/me",
     async ({ user, query }: any) => {
@@ -191,19 +192,19 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  
+
   .get(
     "/status/:status",
     async ({ params, user }: any) => {
       if (user.role !== "ADMIN") {
         throw new Error("Acesso negado");
       }
-      
+
       const validStatuses = Object.values(OrderStatus);
       if (!validStatuses.includes(params.status as OrderStatus)) {
         throw new Error(`Status inválido. Valores válidos: ${validStatuses.join(', ')}`);
       }
-      
+
       const orders = await orderService.getOrdersByStatus(params.status as OrderStatus);
       return {
         success: true,
@@ -223,17 +224,17 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  
-  
+
+
   .get(
     "/:id",
     async ({ params, user }: any) => {
       const order = await orderService.getOrderById(params.id);
-      
+
       if (user.role !== "ADMIN" && order.userId !== user.id) {
         throw new Error("Acesso negado");
       }
-      
+
       return {
         success: true,
         data: order,
@@ -249,15 +250,15 @@ export const orders = new Elysia({ prefix: "/orders" })
       },
     }
   )
-  
-  
+
+
   .patch(
     "/:id/status",
     async ({ params, body, user }: any) => {
       if (user.role !== "ADMIN") {
         throw new Error("Acesso negado");
       }
-      
+
       const order = await orderService.updateOrderStatus(params.id, body.status);
       return {
         success: true,
@@ -278,16 +279,16 @@ export const orders = new Elysia({ prefix: "/orders" })
     }
   )
 
-  .delete(
-    "/:id",
+  .patch(
+    "/cancel-order/:id",
     async ({ params, user }: any) => {
       const order = await orderService.getOrderById(params.id);
-      
+
       if (user.role !== "ADMIN" && order.userId !== user.id) {
         throw new Error("Acesso negado");
       }
-      
-      const cancelledOrder = await orderService.cancelOrder(params.id);
+
+      const cancelledOrder = await orderService.cancelOrderPending(params.id);
       return {
         success: true,
         data: cancelledOrder,
