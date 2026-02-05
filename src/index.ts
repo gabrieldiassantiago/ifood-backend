@@ -10,12 +10,12 @@ import { payments } from "./modules/payments/payment.controller";
 import { addresses } from "./modules/addresses/address.controller";
 import { deliveryFees } from "./modules/delivery/delivery.controller";
 import { categories } from "./modules/categories/category.controller";
-import { uploadController } from "./modules/upload/upload.controller";
 import { configureMercadoPago } from "./config/mercadopago.config";
 import { store } from "./modules/store/store.controller";
 import { websocket } from "./modules/websocket/websocket.controller";
-import { z } from "zod"; 
- 
+import { errorHandler } from "./middlewares/error.middleware";
+import { z } from "zod";
+
 try {
   configureMercadoPago();
   console.log(" Mercado Pago configurado com sucesso");
@@ -24,7 +24,12 @@ try {
 }
 
 const app = new Elysia()
-  .use(cors())
+  .use(cors({
+    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }))
   .use(staticPlugin({
     assets: "public",
     prefix: "/",
@@ -32,9 +37,7 @@ const app = new Elysia()
   .use(
     openapi({
       path: "/docs",
-
       provider: "scalar",
-
       documentation: {
         info: {
           title: "iFood Clone API Documentation",
@@ -63,17 +66,17 @@ const app = new Elysia()
           },
         },
       },
-
       mapJsonSchema: {
-        zod: z.toJSONSchema,  
+        zod: z.toJSONSchema,
       },
-
       exclude: {
         methods: ["OPTIONS"],
       },
-
     })
   )
+  .use(errorHandler)
+  
+  .get("/ping", () => ({ ok: true }))
 
   .get("/api", () => ({
     message: "iFood API",
@@ -91,7 +94,6 @@ const app = new Elysia()
   .use(addresses)
   .use(deliveryFees)
   .use(store)
-  .use(uploadController)
   .use(websocket)
   .listen(3001);
 
