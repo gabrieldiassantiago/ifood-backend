@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia"
 import { CreateUserInput, CreateUserSchema, UserResponseSchema, ErrorResponseSchema } from "./model"
 import { UsersService } from "./users.service"
-import { adminGuard } from "../../middlewares/auth.middleware"
+import { UserNotFoundError } from "./errors/user.errors"
 import z from "zod"
 
 const service = new UsersService()
@@ -51,12 +51,11 @@ export const users = new Elysia({ prefix: "/users" })
 
   .get(
     "/:id",
-    async ({ params: { id }, set }) => {
+    async ({ params: { id } }) => {
       const foundUser = await service.getUserById(id)
 
       if (!foundUser) {
-        set.status = 404
-        return { message: "User not found" }
+        throw new UserNotFoundError(id)
       }
 
       return foundUser
