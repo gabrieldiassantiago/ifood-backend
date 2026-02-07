@@ -7,6 +7,7 @@ import { Role } from '../../generated/prisma/enums';
 describe("UsersService", () => {
     let service: UsersService;
     let mockRepository: UsersRepository;
+
     beforeEach(() => {
         mockRepository = {
             findAll: mock(() => Promise.resolve([])),
@@ -102,7 +103,7 @@ describe("UsersService", () => {
                 role: Role.USER,
                 createdAt: new Date(),
             };
-            
+
             mockRepository.findByEmail = mock(() => Promise.resolve(existingUser)) as any;
             mockRepository.findByPhone = mock(() => Promise.resolve(null)) as any;
 
