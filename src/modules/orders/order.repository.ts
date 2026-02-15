@@ -2,8 +2,11 @@ import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../../prisma/db";
 
 export class OrderRepository {
-  create(data: Prisma.OrderCreateInput) {
-    return prisma.order.create({
+  create(
+    data: Prisma.OrderCreateInput,
+    db: Prisma.TransactionClient | typeof prisma = prisma
+  ) {
+    return db.order.create({
       data,
       include: {
         user: true,
