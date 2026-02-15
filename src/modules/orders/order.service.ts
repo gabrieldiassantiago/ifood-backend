@@ -7,19 +7,18 @@ import { Prisma } from "../../../generated/prisma/client";
 import {
   InvalidOrderItemError,
   InvalidQuantityError,
-  DeliveryFeeNotFoundError,
   OrderNotFoundError
 } from "./errors/order.errors";
+import { DeliveryFeeNotFoundError } from "../delivery/errors/delivery.errors";
 import { wsService } from "../websocket/websocket.service";
-import { PaymentService } from "../payments/payment.service";
 
 export class OrderService {
   constructor(
     private repository: OrderRepository = new OrderRepository(),
-    private paymentService: PaymentService = new PaymentService()
   ) { }
 
   async createOrder(data: CreateOrderInput) {
+    
     if (!data.items.length) {
       throw new InvalidOrderItemError("Pedido sem itens");
     }
@@ -30,90 +29,93 @@ export class OrderService {
       }
     }
 
-    const products = await prisma.product.findMany({
-      where: { id: { in: data.items.map(i => i.productId) } }
-    });
-
-    if (products.length !== data.items.length) {
-      throw new InvalidOrderItemError("Produto não encontrado");
-    }
-
-    let subtotal = 0;
-
-    const itemsCreate = data.items.map(item => {
-      const product = products.find(p => p.id === item.productId)!;
-
-      const addonsTotal =
-        item.addons?.reduce((s, a) => s + a.price, 0) ?? 0;
-
-      const price = (product.price + addonsTotal) * item.quantity;
-      subtotal += price;
-
-      return {
-        product: { connect: { id: product.id } },
-        quantity: item.quantity,
-        observation: item.observation,
-        price,
-        addons: {
-          create: item.addons?.map(a => ({
-            name: a.name,
-            price: a.price
-          })) ?? []
-        }
-      };
-    });
-
-    let deliveryFee = 0;
-
-    if (data.deliveryType === "DELIVERY") {
-      const fee = await prisma.deliveryFee.findFirst({
-        where: {
-          district: data.deliveryDistrict,
-          isActive: true
-        }
+    const order = await prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { id: { in: data.items.map(i => i.productId) } }
       });
 
-      if (!fee) {
-        throw new DeliveryFeeNotFoundError(data.deliveryDistrict);
+      if (products.length !== data.items.length) {
+        throw new InvalidOrderItemError("Produto não encontrado");
       }
 
-      deliveryFee = fee.price;
-    }
+      let subtotal = 0;
 
-    const total = subtotal + deliveryFee;
+      const itemsCreate = data.items.map(item => {
 
-    if (data.paymentMethod === "CASH" && data.changeFor !== undefined) {
-      if (data.changeFor < total) {
-        throw new Error(`O valor para troco (R$ ${data.changeFor.toFixed(2)}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2)})`);
+        const product = products.find(p => p.id === item.productId)!;
+
+        const addonsTotal =
+          item.addons?.reduce((s, a) => s + a.price, 0) ?? 0;
+
+        const price = (product.price + addonsTotal) * item.quantity;
+        subtotal += price;
+
+        return {
+          product: { connect: { id: product.id } },
+          quantity: item.quantity,
+          observation: item.observation,
+          price,
+          addons: {
+            create: item.addons?.map(a => ({
+              name: a.name,
+              price: a.price
+            })) ?? []
+          }
+        };
+      });
+
+      let deliveryFee = 0;
+
+      if (data.deliveryType === "DELIVERY") {
+        const fee = await tx.deliveryFee.findFirst({
+          where: {
+            district: data.deliveryDistrict,
+            isActive: true
+          }
+        });
+
+        if (!fee) {
+          throw new DeliveryFeeNotFoundError(data.deliveryDistrict);
+        }
+
+        deliveryFee = fee.price;
       }
-    }
 
-    const status =
-      data.paymentMethod === "PIX"
-        ? OrderStatus.PENDING_PAYMENT
-        : OrderStatus.PENDING;
+      const total = subtotal + deliveryFee;
 
-    const orderData: Prisma.OrderCreateInput = {
-      user: { connect: { id: data.userId } },
-      deliveryDistrict: data.deliveryDistrict,
-      deliveryType: data.deliveryType,
-      paymentMethod: data.paymentMethod,
-      changeFor: data.changeFor,
-      observation: data.observation,
-      subtotal,
-      deliveryFee,
-      total,
-      status,
-      items: { create: itemsCreate }
-    };
+      if (data.paymentMethod === "CASH" && data.changeFor !== undefined) {
+        if (data.changeFor < total) {
+          throw new Error(`O valor para troco (R$ ${data.changeFor.toFixed(2)}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2)})`);
+        }
+      }
 
-    if (data.deliveryType === "DELIVERY") {
-      orderData.address = {
-        connect: { id: data.addressId }
+      const status =
+        data.paymentMethod === "PIX"
+          ? OrderStatus.PENDING_PAYMENT
+          : OrderStatus.PENDING;
+
+      const orderData: Prisma.OrderCreateInput = {
+        user: { connect: { id: data.userId } },
+        deliveryDistrict: data.deliveryDistrict,
+        deliveryType: data.deliveryType,
+        paymentMethod: data.paymentMethod,
+        changeFor: data.changeFor,
+        observation: data.observation,
+        subtotal,
+        deliveryFee,
+        total,
+        status,
+        items: { create: itemsCreate }
       };
-    }
 
-    const order = await this.repository.create(orderData);
+      if (data.deliveryType === "DELIVERY") {
+        orderData.address = {
+          connect: { id: data.addressId }
+        };
+      }
+
+      return this.repository.create(orderData, tx);
+    });
 
     wsService.broadcastToAdmins("order:created", { order });
 
