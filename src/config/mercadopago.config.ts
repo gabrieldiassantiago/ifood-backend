@@ -4,7 +4,7 @@ import { MercadoPagoClientConfig } from "./mercadopago.types";
 
 /**
  * Configura o MercadoPago com as credenciais necessárias
- * @param config - Configurações opcionais do cliente
+ * @param config 
  */
 export const configureMercadoPago = (config?: MercadoPagoClientConfig): void => {
   mercadoPagoService.configure(config);
@@ -32,6 +32,7 @@ export const getMercadoPagoRefundClient = (): PaymentRefund => {
  * Verifica se o MercadoPago está configurado e pronto para uso
  * @returns True se está configurado, false caso contrário
  */
+
 export const isMercadoPagoReady = (): boolean => {
   return mercadoPagoService.isReady();
 };
