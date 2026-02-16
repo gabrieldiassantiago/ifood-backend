@@ -7,23 +7,19 @@ export class UsersService {
     )
     {}
 
-    async getAllUsers(): Promise<UserResponse[]> {
+    /*async getAllUsers(): Promise<UserResponse[]> {
         const users = await this.usersRepository.findAll();
         return users;
     }
+    */
 
     async getUserById(id: string): Promise<UserResponse | null> {
         const user = await this.usersRepository.findById(id);
         return user;
     }
-    
+
     async createUser(data: CreateUserInput): Promise<UserResponse> {
       
-        const existingUserByEmail = data.email ? await this.usersRepository.findByEmail(data.email) : null;
-
-        if (existingUserByEmail) {
-            throw new Error("Email já em uso");
-        }
         
         const existingUserByPhone = await this.usersRepository.findByPhone(data.phone);
 
@@ -42,6 +38,7 @@ export class UsersService {
         password: hashedPassword,
         
        })
+       
        return newUser;
 
     }
