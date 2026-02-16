@@ -1,39 +1,44 @@
-import { MercadoPagoConfig, Payment, PaymentRefund, } from "mercadopago";
+import { Payment, PaymentRefund } from "mercadopago";
+import { mercadoPagoService } from "./mercadopago.service";
+import { MercadoPagoClientConfig } from "./mercadopago.types";
 
-let mercadoPagoClient: Payment;
-let mercadoPagoRefundClient: PaymentRefund;
-
-export const configureMercadoPago = () => {
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  
-  if (!accessToken) {
-    throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurado nas variáveis de ambiente");
-  }
-
-  const client = new MercadoPagoConfig({ 
-    accessToken,
-    options: { timeout: 5000 }
-  });
-  
-  mercadoPagoClient = new Payment(client);
-  mercadoPagoRefundClient = new PaymentRefund(client);
-
+/**
+ * Configura o MercadoPago com as credenciais necessárias
+ * @param config - Configurações opcionais do cliente
+ */
+export const configureMercadoPago = (config?: MercadoPagoClientConfig): void => {
+  mercadoPagoService.configure(config);
 };
 
+/**
+ * Retorna o cliente de pagamentos do MercadoPago
+ * @returns Cliente de pagamentos configurado
+ * @throws {MercadoPagoNotConfiguredError} Se o MercadoPago não foi configurado
+ */
 export const getMercadoPagoClient = (): Payment => {
-
-  if (!mercadoPagoClient) {
-    throw new Error("Mercado Pago não foi configurado. Chame configureMercadoPago() primeiro.");
-  }
-  
-  return mercadoPagoClient;
+  return mercadoPagoService.getPaymentClient();
 };
 
+/**
+ * Retorna o cliente de reembolsos do MercadoPago
+ * @returns Cliente de reembolsos configurado
+ * @throws {MercadoPagoNotConfiguredError} Se o MercadoPago não foi configurado
+ */
 export const getMercadoPagoRefundClient = (): PaymentRefund => {
+  return mercadoPagoService.getRefundClient();
+};
 
-  if (!mercadoPagoRefundClient) {
-    throw new Error("Mercado Pago não foi configurado. Chame configureMercadoPago() primeiro.");
-  }
-  
-  return mercadoPagoRefundClient;
+/**
+ * Verifica se o MercadoPago está configurado e pronto para uso
+ * @returns True se está configurado, false caso contrário
+ */
+export const isMercadoPagoReady = (): boolean => {
+  return mercadoPagoService.isReady();
+};
+
+/**
+ * Reseta a configuração do MercadoPago
+ */
+export const resetMercadoPago = (): void => {
+  mercadoPagoService.reset();
 };
