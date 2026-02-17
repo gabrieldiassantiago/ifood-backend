@@ -54,7 +54,12 @@ export const auth = new Elysia({ prefix: "/auth" })
         },
         {
             body: LoginByPhoneSchema,
-            response: { 200: AuthResponseSchema, 401: AuthErrorSchema }
+            response: { 200: AuthResponseSchema, 401: AuthErrorSchema },
+            detail: {
+                tags: ["Auth"],
+                summary: "Fazer login",
+                description: "Autentica o usuário com telefone e senha, retornando token JWT e refresh token.",
+            }
         }
     )
 
@@ -69,4 +74,11 @@ export const auth = new Elysia({ prefix: "/auth" })
         const result = await authService.refreshAccessToken(refreshToken, jwt);
 
         return result;
+    },
+    {
+        detail: {
+            tags: ["Auth"],
+            summary: "Renovar token de acesso",
+            description: "Renova o token de acesso JWT usando o refresh token armazenado nos cookies.",
+        }
     })
