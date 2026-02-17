@@ -11,9 +11,7 @@ export const websocket = new Elysia({ prefix: "/ws" })
     })
   )
 
-
-  .ws("/notifications", {
-
+  .ws("/chat", {
     query: t.Object({
       token: t.String(),
     }),
@@ -21,14 +19,25 @@ export const websocket = new Elysia({ prefix: "/ws" })
     // Quando a conexão é estabelecida
     async open(ws) {
       try {
-
+        console.log(" Nova conexão WebSocket tentando...");
+        
         const token = ws.data.query.token;
+        
+        if (!token) {
+          console.error(" Token não fornecido");
+          ws.close(4001, "Token não fornecido");
+          return;
+        }
+
         const payload: any = await ws.data.jwt.verify(token);
 
         if (!payload) {
-          ws.close();
+          console.error(" Token inválido ou expirado");
+          ws.close(4002, "Token inválido");
           return;
         }
+
+        console.log(" WebSocket autenticado:", { userId: payload.id, role: payload.role });
 
         // Armazenar dados do usuário no WebSocket nativo
         const rawWs: any = ws.raw;
@@ -41,12 +50,12 @@ export const websocket = new Elysia({ prefix: "/ws" })
 
         wsService.addConnection(ws.raw as any);
 
-        // Enviar mensagem de boas-vindas
+        // Enviar mensagem de boas-vindas ao chat
         ws.send(
           JSON.stringify({
             event: "connected",
             data: {
-              message: "Conectado ao servidor de notificações",
+              message: "Conectado ao servidor de chat",
               userId: payload.id,
               role: payload.role,
             },
@@ -54,8 +63,8 @@ export const websocket = new Elysia({ prefix: "/ws" })
           })
         );
       } catch (error) {
-        console.error("Erro ao autenticar WebSocket:", error);
-        ws.close();
+        console.error(" Erro ao autenticar WebSocket:", error);
+        ws.close(4003, "Erro de autenticação");
       }
     },
 
@@ -65,6 +74,11 @@ export const websocket = new Elysia({ prefix: "/ws" })
         // Parse da mensagem se for string
         const parsedMessage = typeof message === 'string' ? JSON.parse(message) : message;
         const { event, data } = parsedMessage;
+
+        if (event === "ping") {
+          ws.send(JSON.stringify({ event: "pong", timestamp: new Date().toISOString() }));
+          return;
+        }
 
         if (event === "join_chat") {
           const { orderId } = data;
@@ -87,7 +101,7 @@ export const websocket = new Elysia({ prefix: "/ws" })
             timestamp: new Date().toISOString()
           }));
 
-          console.log(`Usuario ${(ws.raw.data as any).userId} entrou no chat do pedido ${orderId}`);
+          console.log(` Usuário ${(ws.raw.data as any).userId} entrou no chat do pedido ${orderId}`);
         }
 
         if (event === "send_message") {
@@ -111,22 +125,20 @@ export const websocket = new Elysia({ prefix: "/ws" })
           });
 
           ws.raw.publish(`order_${orderId}`, msgPayload);
-
           ws.send(msgPayload);
         }
 
       } catch (error) {
-        console.error("Erro no processamento da mensagem:", error);
+        console.error(" Erro no processamento da mensagem:", error);
       }
     },
 
     // Quando a conexão é fechada
-    close(ws) {
+    close(ws, code, message) {
+      console.log(` WebSocket fechado: ${code} - ${message}`);
       wsService.removeConnection(ws.raw as any);
     },
 
-    // Configurações do WebSocket
-    idleTimeout: 120,
-    maxPayloadLength: 16 * 1024 * 1024, // 16MB
+    idleTimeout: 600, 
+    maxPayloadLength: 16 * 1024 * 1024, 
   });
-
