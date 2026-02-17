@@ -20,9 +20,11 @@ export const authMacro = new Elysia({ name: "authMacro" })
       secret: Bun.env.JWT_SECRET || "secreto",
     })
   )
+
   .macro({
     isAuth: {
-      resolve: async ({ jwt, headers, set }) => {
+      
+      resolve: async ({ jwt, headers }) => {
 
         const authHeader = headers["authorization"] || headers["Authorization"];
 
@@ -31,13 +33,12 @@ export const authMacro = new Elysia({ name: "authMacro" })
             ? authHeader.slice(7)
             : null;
 
-        // 2) tenta cookie token=
         if (!token) token = getCookie(headers as any, "token");
 
-        if (!token) return status(401, "Missing token");
+        if (!token) return status(401, "Token de autenticação ausente");
 
         const payload = await jwt.verify(token);
-        if (!payload) return status(401, "Invalid or expired token");
+        if (!payload) return status(401, "Token inválido ou expirado");
 
         return { user: payload };
       },
@@ -47,7 +48,7 @@ export const authMacro = new Elysia({ name: "authMacro" })
       isAuth: true,
       resolve: ({ user }: any) => {
         if ((user as any)?.role !== "ADMIN")
-          return status(403, "Admin access required");
+        throw status(403, "Acesso negado");
       },
     },
   });
