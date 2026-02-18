@@ -8,24 +8,6 @@ const service = new UsersService()
 
 export const users = new Elysia({ prefix: "/users" })
 
-  .get(
-    "/",
-    async () => {
-      return service.getAllUsers()
-    },
-    {
-      response: {
-       200: z.array(UserResponseSchema),
-      },
-      detail: {
-        tags: ["Users"],
-        summary: "Listar todos os usuários",
-        description: "Retorna uma lista de todos os usuários cadastrados no sistema. Requer autenticação como ADMIN.",
-        security: [{ bearerAuth: [] }],
-      },
-    }
-  )
-
   .post(
     "/",
     async ({body}) => {
