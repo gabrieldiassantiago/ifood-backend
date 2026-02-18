@@ -1,32 +1,41 @@
-import { OrderStatus, PaymentMethod, DeliveryType } from "../../../generated/prisma/enums";
+import { PaymentMethod } from "../../../generated/prisma/enums";
 
-export interface CreateOrderInput {
+export type DeliveryType = "DELIVERY" | "PICKUP";
+
+export type OrderItemAddonInput = {
+  name: string;
+  price: number;
+};
+
+export type OrderItemInput = {
+  productId: string;
+  quantity: number;
+  observation?: string;
+  addons?: OrderItemAddonInput[];
+};
+
+type BaseCreateOrderInput = {
   userId: string;
-  addressId: string;
   deliveryDistrict: string;
-  deliveryType?: DeliveryType;
   paymentMethod: PaymentMethod;
   changeFor?: number;
   observation?: string;
   items: OrderItemInput[];
-}
+};
 
-export interface OrderItemInput {
-  productId: string;
-  quantity: number;
-  addons?: OrderItemAddonInput[];
-  observation?: string;
-}
+export type CreateOrderDeliveryInput = BaseCreateOrderInput & {
+  deliveryType: "DELIVERY";
+  addressId: string;
+};
 
-export interface OrderItemAddonInput {
-  name: string;
-  price: number;
-}
+export type CreateOrderPickupInput = BaseCreateOrderInput & {
+  deliveryType: "PICKUP";
+  addressId?: never;
+};
 
-export interface UpdateOrderStatusInput {
-  orderId: string;
-  status: OrderStatus;
-}
+export type CreateOrderInput =
+  | CreateOrderDeliveryInput
+  | CreateOrderPickupInput;
 
 export interface OrderSummary {
   subtotal: number;
