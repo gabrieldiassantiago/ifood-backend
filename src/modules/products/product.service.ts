@@ -1,6 +1,7 @@
 import { ProductRepository } from "./product.repository";
 import { CreateProductInput, UpdateProductInput } from "./product.model";
 import { ProductNotFoundError, InvalidPriceError } from "./errors/products.errors";
+import { UploadService } from "../upload/upload.service";
 
 
 function extractFileIdFromUrl(url: string | null): string | null {
@@ -18,6 +19,7 @@ function extractFileIdFromUrl(url: string | null): string | null {
 export class ProductService {
   constructor(
     private repository: ProductRepository = new ProductRepository(),
+    private uploadService: UploadService = new UploadService()
   ) {}
 
   // Retorna todos os produtos (admin)
@@ -44,13 +46,38 @@ export class ProductService {
     return this.repository.findByCategory(categoryId);
   }
 
-  async createProduct(data: CreateProductInput) {
-
+    async createProduct(data: CreateProductInput, file?: File) {
     if (data.price <= 0) {
       throw new InvalidPriceError();
     }
 
-    return this.repository.create(data);
+    const categoryExists = await this.repository.findExistCategory(data.categoryId);
+    if (!categoryExists) {
+      throw new Error(`Categoria com ID ${data.categoryId} não existe.`);
+    }
+
+    try {
+      const { file: _, ...productData } = data as any;
+      
+      if (!file) {
+        return await this.repository.create(productData);
+      }
+
+      const [createdProduct, imageUrl] = await Promise.all([
+        this.repository.create(productData),
+        this.uploadService.uploadFile(file, crypto.randomUUID()) 
+      ]);
+
+      const finalImageUrl = imageUrl.replace(crypto.randomUUID(), createdProduct.id);
+      
+      return await this.repository.update(createdProduct.id, { 
+        imageUrl: finalImageUrl 
+      });
+      
+    } catch (error) {
+      console.error("Erro ao criar produto:", error);
+      throw error;
+    }
   }
 
   async updateProduct(id: string, data: UpdateProductInput) {
@@ -60,16 +87,13 @@ export class ProductService {
     if (data.price !== undefined && data.price <= 0) {
       throw new InvalidPriceError();
     }
+    if (data.categoryId) {
 
-    // Verificar se a imagem foi removida ou alterada
-    if (data.imageUrl !== undefined && currentProduct.imageUrl) {
-      const oldFileId = extractFileIdFromUrl(currentProduct.imageUrl);
-      const newFileId = extractFileIdFromUrl(data.imageUrl);
-      
-      // Se a imagem foi removida (imageUrl = null ou vazio) ou alterada para outra URL
-      if (oldFileId && oldFileId !== newFileId) {
-        // Deletar imagem antiga do Appwrite
+      const categoryExists = await this.repository.findExistCategory(data.categoryId);
+      if (!categoryExists) {
+        throw new Error(`Categoria com ID ${data.categoryId} não existe.`);
       }
+      
     }
 
     return this.repository.update(id, data);
@@ -108,7 +132,6 @@ export class ProductService {
   }
 
   async getProductAddons(productId: string) {
-    await this.getProductById(productId);
     return this.repository.findAddonsByProductId(productId);
   }
 
