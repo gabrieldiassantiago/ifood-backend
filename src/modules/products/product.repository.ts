@@ -117,6 +117,12 @@ export class ProductRepository {
       },
     });
   }
+  
+  findExistCategory(categoryId: string) {
+    return prisma.category.findUnique({
+      where: { id: categoryId, isActive: true },
+    });
+  }
 
   create(data: CreateProductInput) {
     return prisma.product.create({
@@ -181,4 +187,5 @@ export class ProductRepository {
       where: { id },
     });
   }
+
 }
