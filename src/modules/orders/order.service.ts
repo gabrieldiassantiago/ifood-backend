@@ -207,7 +207,11 @@ export class OrderService {
       throw new Error("Pedido já foi cancelado");
     }
 
-    await this.repository.updateStatus(orderId, OrderStatus.PENDING_CANCELLATION);
+    await this.repository.updateStatus(orderId, OrderStatus.CANCELLED);
+
+    wsService.broadcastToAdmins("order:pending_cancellation", { orderId });
+
+    wsService.sendToUser(order.userId, "order:pending_cancellation", { orderId });
   }
 
 }
