@@ -1,5 +1,6 @@
 import { uuid, uuidv4 } from "zod";
 import { AuthRepository } from "./auth.repository";
+import { UnauthorizedError } from "../../errors/custom-errors";
 
 export class AuthService {
     constructor(
@@ -11,7 +12,7 @@ export class AuthService {
         const user = await this.authRepository.findByPhone(phone);
 
         if (!user || !(await Bun.password.verify(pass, user.password))) {
-            throw new Error("Telefone ou senha inválidos");
+            throw new UnauthorizedError("Telefone ou senha inválidos");
         }
 
         const token = await jwt.sign({
@@ -43,13 +44,13 @@ export class AuthService {
         const tokenData = await this.authRepository.findRefreshToken(refreshToken);
 
         if (!tokenData || tokenData.expiresAt < new Date()) {
-            throw new Error("Refresh token inválido ou expirado");
+            throw new UnauthorizedError("Refresh token inválido ou expirado");
         }
 
         const user = await this.authRepository.findById(tokenData.userId);
 
         if (!user) {
-            throw new Error("Usuário não encontrado");
+            throw new UnauthorizedError("Usuário não encontrado");
         }
 
         const newToken = await jwt.sign({
